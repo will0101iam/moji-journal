@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0B5E42" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121512" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="墨记">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' rx='40' fill='%230B5E42'/%3E%3Ctext x='90' y='124' font-size='96' font-family='PingFang SC,sans-serif' fill='white' text-anchor='middle'%3E墨%3C/text%3E%3C/svg%3E">
+<title>墨记 · 极简记账</title>
+<style>
+/* ============ 设计 Token:墨绿极简高级感 ============ */
+:root{
+  --bg:#FBFBFA;
+  --surface:#FFFFFF;
+  --surface-muted:#F4F5F3;
+  --text:#1A1F1C;
+  --text-muted:#6B726D;
+  --text-faint:#9AA09B;
+  --border:rgba(26,31,28,0.08);
+  --border-strong:rgba(26,31,28,0.14);
+  --brand:#0B5E42;          /* 墨绿 */
+  --brand-strong:#084A34;
+  --brand-soft:#E8F1EC;
+  --brand-text:#0B5E42;
+  --danger:#C0493B;
+  --danger-soft:#FBEDEB;
+  --warning:#B8860B;
+  --up:#C0493B;             /* 支出-红 */
+  --down:#0B5E42;           /* 收入-绿 */
+  --radius:10px;
+  --radius-lg:16px;
+  --radius-full:999px;
+  --shadow-sm:0 1px 2px rgba(26,31,28,.04),0 1px 3px rgba(26,31,28,.04);
+  --shadow-md:0 2px 8px rgba(26,31,28,.05),0 6px 20px rgba(26,31,28,.04);
+  --sp-4:4px;--sp-8:8px;--sp-12:12px;--sp-16:16px;--sp-20:20px;--sp-24:24px;--sp-32:32px;
+  --font:"SF Pro Text","PingFang SC",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+[data-theme="dark"]{
+  --bg:#121512;
+  --surface:#1A1E1A;
+  --surface-muted:#22271F;
+  --text:#E8EAE6;
+  --text-muted:#9BA298;
+  --text-faint:#6B726A;
+  --border:rgba(232,234,230,0.09);
+  --border-strong:rgba(232,234,230,0.16);
+  --brand:#2FB488;
+  --brand-strong:#45C79A;
+  --brand-soft:#15291F;
+  --brand-text:#45C79A;
+  --danger:#E0695A;
+  --danger-soft:#2A1A17;
+  --up:#E0695A;
+  --down:#2FB488;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.2);
+  --shadow-md:0 2px 10px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  display:flex;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--brand-soft)}
+
+/* ============ 侧边导航 ============ */
+.sidebar{
+  width:220px;flex-shrink:0;height:100vh;position:sticky;top:0;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:var(--sp-20) var(--sp-12);
+}
+.brand{display:flex;align-items:center;gap:var(--sp-12);padding:var(--sp-8) var(--sp-12) var(--sp-24);}
+.brand-logo{width:28px;height:28px;border-radius:8px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:600;font-size:15px}
+.brand-name{font-weight:600;font-size:16px;letter-spacing:.3px}
+.brand-sub{font-size:11px;color:var(--text-faint);margin-top:-2px}
+.nav{display:flex;flex-direction:column;gap:2px;flex:1}
+.nav-item{
+  display:flex;align-items:center;gap:var(--sp-12);padding:9px var(--sp-12);
+  border-radius:var(--radius);color:var(--text-muted);font-size:14px;font-weight:500;
+  transition:background .15s,color .15s;
+}
+.nav-item svg{width:18px;height:18px;stroke-width:1.6}
+.nav-item:hover{background:var(--surface-muted);color:var(--text)}
+.nav-item.active{background:var(--brand-soft);color:var(--brand-text)}
+.nav-foot{display:flex;flex-direction:column;gap:2px;padding-top:var(--sp-12);border-top:1px solid var(--border)}
+.theme-toggle{display:flex;align-items:center;gap:var(--sp-12);padding:9px var(--sp-12);border-radius:var(--radius);color:var(--text-muted);font-size:14px;font-weight:500;width:100%}
+.theme-toggle:hover{background:var(--surface-muted);color:var(--text)}
+
+/* ============ 主区 ============ */
+.main{flex:1;min-width:0;height:100vh;overflow-y:auto}
+.page{max-width:1080px;margin:0 auto;padding:var(--sp-32) var(--sp-32) 80px}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:var(--sp-24);gap:var(--sp-16);flex-wrap:wrap}
+.page-title{font-size:24px;font-weight:600;letter-spacing:.2px}
+.page-sub{font-size:13px;color:var(--text-muted);margin-top:2px}
+
+/* ============ 通用组件 ============ */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-20);box-shadow:var(--shadow-sm)}
+.card-title{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:var(--sp-16)}
+.grid{display:grid;gap:var(--sp-16)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.btn{
+  display:inline-flex;align-items:center;gap:var(--sp-8);padding:9px 16px;border-radius:var(--radius);
+  background:var(--brand);color:#fff;font-weight:600;font-size:14px;transition:background .15s,transform .05s;
+  box-shadow:var(--shadow-sm)
+}
+.btn:hover{background:var(--brand-strong)}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:16px;height:16px;stroke-width:2}
+.btn-ghost{background:var(--surface-muted);color:var(--text);box-shadow:none}
+.btn-ghost:hover{background:var(--border-strong)}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-danger{background:transparent;color:var(--danger)}
+.btn-danger:hover{background:var(--danger-soft)}
+.tag{display:inline-flex;align-items:center;padding:2px 9px;border-radius:var(--radius-full);background:var(--surface-muted);color:var(--text-muted);font-size:12px;font-weight:500}
+.chip-cat{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pill{padding:5px 12px;border-radius:var(--radius-full);background:var(--surface-muted);color:var(--text-muted);font-size:13px;font-weight:500}
+.pill.active{background:var(--brand);color:#fff}
+.muted{color:var(--text-muted)}
+.faint{color:var(--text-faint)}
+.right{text-align:right}
+.flex{display:flex;align-items:center}
+.between{display:flex;align-items:center;justify-content:space-between}
+.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}
+.mt8{margin-top:8px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+.wrap{flex-wrap:wrap}
+
+/* KPI */
+.kpi-label{font-size:13px;color:var(--text-muted);font-weight:500}
+.kpi-value{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:-.5px;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi-delta{font-size:12px;margin-top:6px;font-weight:500}
+.kpi-delta.up{color:var(--up)}
+.kpi-delta.down{color:var(--down)}
+
+/* 列表 */
+.tx-row{display:flex;align-items:center;gap:var(--sp-12);padding:11px 0;border-top:1px solid var(--border)}
+.tx-row:first-child{border-top:none}
+.tx-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex-shrink:0;font-size:15px}
+.tx-main{flex:1;min-width:0}
+.tx-name{font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:12px;color:var(--text-faint);margin-top:1px}
+.tx-amt{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tx-amt.exp{color:var(--up)}
+.tx-amt.inc{color:var(--down)}
+
+/* 进度条 */
+.bar{height:7px;border-radius:var(--radius-full);background:var(--surface-muted);overflow:hidden}
+.bar-fill{height:100%;border-radius:var(--radius-full);background:var(--brand);transition:width .4s}
+.bar-fill.over{background:var(--danger)}
+
+/* 表单 */
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;font-weight:600;color:var(--text-muted)}
+.input,.select{
+  width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);
+  background:var(--surface);transition:border-color .15s,box-shadow .15s;outline:none;
+}
+.input:focus,.select:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+textarea.input{resize:vertical;min-height:60px}
+
+/* 模态 */
+.modal-bg{position:fixed;inset:0;background:rgba(10,15,12,.4);backdrop-filter:blur(2px);display:none;place-items:center;z-index:50;padding:20px}
+.modal-bg.open{display:grid}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;padding:var(--sp-24);animation:pop .18s ease}
+.modal.wide{max-width:560px}
+@keyframes pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-20)}
+.modal-title{font-size:18px;font-weight:600}
+.x-btn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--text-muted)}
+.x-btn:hover{background:var(--surface-muted)}
+
+/* AI 区 */
+.drop{
+  border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:var(--sp-32);text-align:center;
+  transition:border-color .15s,background .15s;cursor:pointer;
+}
+.drop:hover,.drop.over{border-color:var(--brand);background:var(--brand-soft)}
+.drop-icon{width:44px;height:44px;margin:0 auto var(--sp-12);color:var(--brand)}
+.ai-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--radius-full);background:var(--brand-soft);color:var(--brand-text);font-size:12px;font-weight:600}
+.spinner{width:18px;height:18px;border:2px solid var(--border-strong);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 空态 */
+.empty{text-align:center;padding:var(--sp-32);color:var(--text-faint)}
+.empty svg{width:40px;height:40px;margin:0 auto var(--sp-12);opacity:.5}
+
+/* toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:var(--radius-full);font-size:13px;font-weight:500;box-shadow:var(--shadow-md);opacity:0;transition:.25s;z-index:100;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* FAB */
+.fab{position:fixed;right:calc(20px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;box-shadow:var(--shadow-md);z-index:40;transition:transform .12s,background .15s}
+.fab:hover{background:var(--brand-strong);transform:scale(1.05)}
+.fab:active{transform:scale(.94)}
+.fab svg{width:24px;height:24px;stroke-width:2.2}
+
+/* 移动端顶栏(默认隐藏,窄屏显示) */
+.topbar{display:none}
+
+/* 响应式 */
+.menu-btn{display:none}
+@media(max-width:860px){
+  .sidebar{position:fixed;left:0;top:0;z-index:60;width:264px;max-width:82vw;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow-md);padding-top:calc(var(--sp-20) + env(safe-area-inset-top))}
+  .sidebar.open{transform:none}
+  /* 顶部 app-bar:汉堡 + 标题,替代悬浮按钮 */
+  .topbar{display:flex;align-items:center;gap:var(--sp-12);position:fixed;top:0;left:0;right:0;z-index:55;
+    height:calc(52px + env(safe-area-inset-top));padding:env(safe-area-inset-top) var(--sp-16) 0;
+    background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(180%) blur(12px);
+    border-bottom:1px solid var(--border)}
+  .topbar-title{font-size:17px;font-weight:600}
+  .menu-btn{display:grid;place-items:center;width:40px;height:40px;margin-left:-8px;border-radius:12px;background:transparent;color:var(--text)}
+  .menu-btn:active{background:var(--surface-muted)}
+  .page{padding:calc(64px + env(safe-area-inset-top)) var(--sp-16) calc(96px + env(safe-area-inset-bottom))}
+  .page-head .page-title{display:none}       /* 标题已在顶栏显示 */
+  .page-head{margin-bottom:var(--sp-16)}
+  .page-head .btn{display:none}               /* 去掉与 FAB 重复的"记一笔" */
+  .grid-3,.grid-2{grid-template-columns:1fr}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:59;display:none}
+  .scrim.open{display:block}
+  /* 热区:导航项、分段控件加大到 ≥44px */
+  .nav-item{padding:12px var(--sp-12);font-size:15px}
+  .nav-item svg{width:20px;height:20px}
+  .theme-toggle{padding:12px var(--sp-12)}
+  .seg button{padding:9px 14px;font-size:14px}
+  .pill{padding:8px 14px}
+  .modal{max-width:none;border-radius:20px 20px 0 0;max-height:92vh;padding:var(--sp-20) var(--sp-20) calc(var(--sp-24) + env(safe-area-inset-bottom))}
+  .modal-bg{align-items:flex-end;padding:0}           /* 手机:底部弹出式 sheet */
+  .modal.wide{max-width:none}
+  .kpi-value{font-size:28px}
+  .tx-icon{width:38px;height:38px}
+  .fab{width:58px;height:58px}
+}
+canvas{max-width:100%}
+.seg{display:inline-flex;background:var(--surface-muted);border-radius:var(--radius);padding:3px;gap:2px}
+.seg button{padding:5px 12px;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
+.seg button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:12px;color:var(--text-faint);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--border)}
+.tbl td{padding:11px 10px;border-bottom:1px solid var(--border);font-size:14px}
+.tbl tr:last-child td{border-bottom:none}
+.toggle-switch{position:relative;width:40px;height:22px;border-radius:999px;background:var(--border-strong);transition:background .2s;flex-shrink:0}
+.toggle-switch.on{background:var(--brand)}
+.toggle-switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s}
+.toggle-switch.on::after{transform:translateX(18px)}
+</style>
+</head>
+<body>
+<div class="scrim" id="scrim" onclick="toggleMenu(false)"></div>
+<!-- 移动端顶栏 -->
+<header class="topbar">
+  <button class="menu-btn" onclick="toggleMenu()" aria-label="菜单">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <span class="topbar-title" id="topbarTitle">仪表盘</span>
+</header>
+
+<!-- 侧边 -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-logo">墨</div>
+    <div>
+      <div class="brand-name">墨记</div>
+      <div class="brand-sub">极简个人记账</div>
+    </div>
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <div class="nav-foot">
+    <button class="theme-toggle" onclick="syncNow()" title="立即同步">
+      <span id="syncDot" data-state="idle" style="width:18px;height:18px;display:grid;place-items:center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12a8 8 0 0114-5.3L20 8M20 12a8 8 0 01-14 5.3L4 16M20 4v4h-4M4 20v-4h4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span id="syncLabel">云同步</span>
+    </button>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span id="themeLabel">深色模式</span>
+    </button>
+  </div>
+</aside>
+
+<style>
+#syncDot[data-state="syncing"]{color:var(--brand);animation:spin 1s linear infinite}
+#syncDot[data-state="idle"]{color:var(--brand)}
+#syncDot[data-state="offline"]{color:var(--text-faint)}
+#syncDot[data-state="error"]{color:var(--danger)}
+</style>
+
+<main class="main" id="main"></main>
+
+<button class="fab" onclick="openTxModal()" aria-label="记一笔">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+</button>
+
+<!-- 交易模态 -->
+<div class="modal-bg" id="txModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="txModalTitle">记一笔</div>
+      <button class="x-btn" onclick="closeModal('txModal')">✕</button>
+    </div>
+    <div id="txForm"></div>
+  </div>
+</div>
+
+<!-- AI 确认模态 -->
+<div class="modal-bg" id="aiModal">
+  <div class="modal wide">
+    <div class="modal-head">
+      <div class="modal-title">AI 识别结果</div>
+      <button class="x-btn" onclick="closeModal('aiModal')">✕</button>
+    </div>
+    <div id="aiModalBody"></div>
+  </div>
+</div>
+
+<!-- 通用模态 -->
+<div class="modal-bg" id="genModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="genTitle"></div>
+      <button class="x-btn" onclick="closeModal('genModal')">✕</button>
+    </div>
+    <div id="genBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+/* ===================== 工具 ===================== */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const todayISO=()=>new Date().toISOString().slice(0,10);
+const CUR=()=>cfg.currency||'¥';
+function fmt(n){return CUR()+Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtNo(n){return Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
+function monthKey(d){return d.slice(0,7);}
+function curMonth(){return todayISO().slice(0,7);}
+function escapeHtml(s){return(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ===================== 存储层 (IndexedDB) ===================== */
+const DB_NAME='mojiDB',DB_VER=1;
+let db;
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,DB_VER);
+    r.onupgradeneeded=e=>{
+      const d=e.target.result;
+      ['transactions','accounts','categories','budgets','goals'].forEach(s=>{
+        if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:'id'});
+      });
+    };
+    r.onsuccess=e=>{db=e.target.result;res();};
+    r.onerror=e=>rej(e);
+  });
+}
+function txStore(store,mode='readonly'){return db.transaction(store,mode).objectStore(store);}
+function dbAll(store){return new Promise(res=>{const o=txStore(store).getAll();o.onsuccess=()=>res(o.result||[]);});}
+// dbPut:自动盖 updatedAt 并标记待同步(除非 opts.fromSync,避免回环)
+function dbPut(store,v,opts={}){
+  if(!opts.fromSync){v.updatedAt=Date.now();v._dirty=1;}
+  return new Promise(res=>{const o=txStore(store,'readwrite').put(v);o.onsuccess=()=>{if(!opts.fromSync)queueSync();res(v);};});
+}
+// dbDel:软删除墓碑(保留记录,标 deleted,供云端同步删除),而非物理删除
+function dbDel(store,id,opts={}){
+  return new Promise(res=>{
+    const os=txStore(store,'readwrite');const g=os.get(id);
+    g.onsuccess=()=>{
+      const cur=g.result;
+      if(opts.hard||!cur){const d=os.delete(id);d.onsuccess=()=>res();return;}
+      cur.deleted=1;cur.updatedAt=Date.now();cur._dirty=1;
+      const p=os.put(cur);p.onsuccess=()=>{if(!opts.fromSync)queueSync();res();};
+    };
+  });
+}
+function dbClear(store){return new Promise(res=>{const o=txStore(store,'readwrite').clear();o.onsuccess=()=>res();});}
+
+/* ===================== 云同步(本地优先 + last-write-wins) ===================== */
+const SYNC_STORES=['transactions','accounts','categories','budgets','goals'];
+let syncTimer=null,syncing=false;
+function syncMeta(){return JSON.parse(localStorage.getItem('mojiSync')||'{"since":0}');}
+function setSyncMeta(m){localStorage.setItem('mojiSync',JSON.stringify(m));}
+function queueSync(){clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,1200);} // 写入后防抖同步
+function setSyncStatus(s){const el=$('#syncDot');if(el){el.dataset.state=s;el.title={idle:'已同步',syncing:'同步中…',offline:'离线(仅本地)',error:'同步失败'}[s]||'';}}
+// 收集所有 _dirty 记录
+async function collectDirty(){
+  const changes=[];
+  for(const store of SYNC_STORES){
+    const all=await new Promise(r=>{const o=txStore(store).getAll();o.onsuccess=()=>r(o.result||[]);});
+    all.filter(x=>x._dirty).forEach(x=>{
+      const{_dirty,...data}=x;
+      changes.push({store,id:x.id,data:JSON.stringify(data),updatedAt:x.updatedAt||Date.now(),deleted:x.deleted?1:0});
+    });
+  }
+  return changes;
+}
+// 清除已成功上行记录的 _dirty 标记
+async function clearDirty(changes){
+  for(const c of changes){
+    await new Promise(r=>{
+      const os=txStore(c.store,'readwrite');const g=os.get(c.id);
+      g.onsuccess=()=>{const v=g.result;if(v&&v._dirty){delete v._dirty;os.put(v).onsuccess=()=>r();}else r();};
+    });
+  }
+}
+// 应用云端下行记录到本地(LWW:云端更新才覆盖;墓碑则删本地)
+async function applyRemote(records){
+  for(const r of records){
+    if(!SYNC_STORES.includes(r.store))continue;
+    const local=await new Promise(res=>{const o=txStore(r.store).get(r.id);o.onsuccess=()=>res(o.result);});
+    const localUpd=local?.updatedAt||0;
+    if(r.updatedAt<=localUpd)continue; // 本地更新,保留
+    if(r.deleted){if(local)await dbDel(r.store,r.id,{hard:true,fromSync:true});continue;}
+    const obj=JSON.parse(r.data);obj.updatedAt=r.updatedAt;
+    await dbPut(r.store,obj,{fromSync:true});
+  }
+}
+async function syncNow(){
+  if(syncing)return;
+  if(!navigator.onLine){setSyncStatus('offline');return;}
+  syncing=true;setSyncStatus('syncing');
+  try{
+    const meta=syncMeta();
+    const changes=await collectDirty();
+    const res=await fetch('/api/sync',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({since:meta.since,changes})
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const out=await res.json();
+    await clearDirty(changes);
+    await applyRemote(out.records||[]);
+    setSyncMeta({since:out.now});
+    setSyncStatus('idle');
+    if(out.records&&out.records.length){await reload();render();}
+  }catch(e){
+    setSyncStatus(navigator.onLine?'error':'offline'); // 失败不影响本地使用
+  }finally{syncing=false;}
+}
+
+/* ===================== 配置 (localStorage) ===================== */
+let cfg=JSON.parse(localStorage.getItem('mojiCfg')||'null')||{
+  currency:'¥',
+  theme:'light',
+  apiKey:'',
+  apiBase:'https://openrouter.ai/api/v1/chat/completions',
+  model:'deepseek/deepseek-v4.1-flash-1017'
+};
+function saveCfg(){localStorage.setItem('mojiCfg',JSON.stringify(cfg));}
+
+/* ===================== 内存缓存 ===================== */
+let DATA={tx:[],accounts:[],categories:[],budgets:[],goals:[]};
+async function reload(){
+  const live=arr=>arr.filter(x=>!x.deleted); // 过滤软删除墓碑
+  DATA.tx=live(await dbAll('transactions')).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  DATA.accounts=live(await dbAll('accounts'));
+  DATA.categories=live(await dbAll('categories'));
+  DATA.budgets=live(await dbAll('budgets'));
+  DATA.goals=live(await dbAll('goals'));
+}
+const catById=id=>DATA.categories.find(c=>c.id===id);
+const acctById=id=>DATA.accounts.find(a=>a.id===id);
+/* 两级分类辅助:一级(parent=null,带色/图标) + 二级(parent=一级id) */
+const topCats=kind=>DATA.categories.filter(c=>!c.parent&&(!kind||c.kind===kind));
+const subCats=topId=>DATA.categories.filter(c=>c.parent===topId);
+const leafCats=kind=>DATA.categories.filter(c=>c.parent&&(!kind||c.kind===kind));
+function topOf(id){const c=catById(id);if(!c)return null;return c.parent?catById(c.parent):c;}
+function catColor(id){return topOf(id)?.color||'#888';}
+function catIcon(id){return topOf(id)?.icon||'•';}
+function catName(id){return catById(id)?.name||'未分类';}            // 二级名
+function catFull(id){const c=catById(id);if(!c)return'未分类';const t=c.parent?catById(c.parent):null;return t?t.name+' · '+c.name:c.name;}
+function catKind(id){return topOf(id)?.kind||'exp';}
+
+/* ===================== 分类体系(两级) ===================== */
+const CAT_TREE={
+  exp:[
+    ['餐饮美食','🍜','#C0493B',['早餐','午餐','晚餐','外卖','零食','饮料','咖啡','聚餐','买菜']],
+    ['服装穿搭','👕','#8E44AD',['衣服','裤子','鞋子','箱包','配饰','洗护']],
+    ['日常购物','🛍️','#D81B60',['日用品','生活用品','数码产品','家电','其他购物']],
+    ['居住住房','🏠','#2C7873',['房租','房贷','水费','电费','燃气费','物业费','维修']],
+    ['交通出行','🚕','#D98324',['公交','地铁','打车','加油','停车','高铁','飞机','车辆保养']],
+    ['休闲娱乐','🎮','#C2185B',['电影','游戏','KTV','演出','旅游','会员娱乐']],
+    ['医疗健康','💊','#0277BD',['看病','药品','体检','牙科','保险','健身']],
+    ['教育学习','📚','#00695C',['书籍','课程','培训','考试','学习工具']],
+    ['数码通讯','📱','#3949AB',['手机费','宽带费','软件','云服务','AI订阅']],
+    ['人情社交','🎁','#E65100',['礼物','红包','请客','婚礼','家庭支持']],
+    ['家庭宠物','🐾','#6D4C41',['育儿','宠物食品','宠物医疗','家庭用品']],
+    ['金融费用','💳','#546E7A',['银行手续费','贷款利息','交易服务费']],
+    ['其他支出','📦','#607D8B',['捐赠','罚款','未分类支出']]
+  ],
+  inc:[
+    ['工作收入','💰','#0B5E42',['工资','奖金','加班费','津贴']],
+    ['副业收入','💼','#2E7D32',['兼职','自由职业','项目收入','稿费']],
+    ['投资收益','📈','#1565C0',['利息','股息','已实现投资收益']],
+    ['经营收入','🏪','#00838F',['商品销售','服务收入']],
+    ['其他收入','🎉','#455A64',['礼金','补贴','现金奖励','其他']]
+  ]
+};
+async function seedCategories(){
+  for(const kind of['exp','inc']){
+    for(const[name,icon,color,leaves]of CAT_TREE[kind]){
+      const topId=uid();
+      await dbPut('categories',{id:topId,name,kind,color,icon,parent:null});
+      for(const leaf of leaves)await dbPut('categories',{id:uid(),name:leaf,kind,parent:topId});
+    }
+  }
+}
+
+/* ===================== 种子数据 ===================== */
+async function seedAll(){
+  await seedCategories();
+  const accts=[
+    ['现金','cash',800],['招商银行','bank',25600],['支付宝','wallet',3200],['微信','wallet',1500],['信用卡','credit',-4300]
+  ];
+  for(const[name,type,balance]of accts)await dbPut('accounts',{id:uid(),name,type,balance});
+  await dbPut('goals',{id:uid(),name:'旅行基金',target:20000,saved:8600,icon:'✈️'});
+  await dbPut('goals',{id:uid(),name:'应急储备',target:50000,saved:32000,icon:'🛟'});
+  await reload();
+  // 示例交易(按二级分类)
+  const leaf=n=>DATA.categories.find(c=>c.name===n&&c.parent)?.id;
+  const ac=n=>DATA.accounts.find(a=>a.name===n).id;
+  const d=(off)=>{const x=new Date();x.setDate(x.getDate()-off);return x.toISOString().slice(0,10);};
+  const seed=[
+    [leaf('工资'),ac('招商银行'),'inc',18000,'10月工资',d(5)],
+    [leaf('午餐'),ac('微信'),'exp',38,'午餐·兰州拉面',d(0)],
+    [leaf('晚餐'),ac('支付宝'),'exp',126,'晚餐·火锅',d(1)],
+    [leaf('地铁'),ac('支付宝'),'exp',12,'地铁',d(1)],
+    [leaf('衣服'),ac('信用卡'),'exp',299,'优衣库',d(2)],
+    [leaf('电影'),ac('微信'),'exp',68,'电影票',d(3)],
+    [leaf('房租'),ac('招商银行'),'exp',3200,'房租',d(4)],
+    [leaf('课程'),ac('支付宝'),'exp',199,'技术课程',d(6)],
+    [leaf('股息'),ac('招商银行'),'inc',320,'基金分红',d(7)],
+    [leaf('早餐'),ac('微信'),'exp',45,'早午餐',d(8)],
+    [leaf('打车'),ac('支付宝'),'exp',30,'打车',d(9)],
+  ];
+  for(const[category,account,kind,amount,note,date]of seed){
+    if(category)await dbPut('transactions',{id:uid(),category,account,kind,amount,note,tags:[],date,createdAt:Date.now()});
+  }
+  // 预算(按一级分类)
+  const top=n=>DATA.categories.find(c=>c.name===n&&!c.parent)?.id;
+  for(const[name,limit]of[['餐饮美食',1500],['日常购物',1000],['交通出行',400],['休闲娱乐',500]]){
+    const id=top(name);if(id)await dbPut('budgets',{id:uid(),category:id,limit,month:curMonth()});
+  }
+  await reload();
+}
+
+/* ===================== 路由 ===================== */
+const ICONS={
+  dashboard:'<path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" stroke-width="1.6" stroke-linejoin="round" fill="none"/>',
+  tx:'<path d="M4 7h16M4 12h16M4 17h10" stroke-width="1.6" stroke-linecap="round"/>',
+  budget:'<path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 0v10l6 3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  accounts:'<rect x="3" y="6" width="18" height="13" rx="2" stroke-width="1.6" fill="none"/><path d="M3 10h18M7 15h4" stroke-width="1.6" stroke-linecap="round"/>',
+  reports:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2" stroke-width="1.6" stroke-linecap="round"/>',
+  settings:'<circle cx="12" cy="12" r="3" stroke-width="1.6" fill="none"/><path d="M12 2v3m0 14v3m10-10h-3M5 12H2m15.5-6.5l-2 2m-7 7l-2 2m13 0l-2-2m-7-7l-2-2" stroke-width="1.4" stroke-linecap="round"/>'
+};
+const ROUTES=[
+  ['dashboard','仪表盘'],['tx','交易'],['budget','预算'],['accounts','账户'],['reports','报表'],['settings','设置']
+];
+let curRoute='dashboard';
+function renderNav(){
+  $('#nav').innerHTML=ROUTES.map(([k,label])=>
+    `<a class="nav-item ${k===curRoute?'active':''}" href="#${k}" onclick="go('${k}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">${ICONS[k]}</svg>${label}</a>`).join('');
+}
+function go(r){curRoute=r;location.hash=r;renderNav();render();toggleMenu(false);$('#main').scrollTop=0;}
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(h&&h!==curRoute&&ROUTES.some(r=>r[0]===h)){curRoute=h;renderNav();render();}});
+
+function render(){
+  const fns={dashboard:viewDashboard,tx:viewTx,budget:viewBudget,accounts:viewAccounts,reports:viewReports,settings:viewSettings};
+  const tb=$('#topbarTitle');if(tb)tb.textContent=(ROUTES.find(r=>r[0]===curRoute)||[])[1]||'墨记';
+  (fns[curRoute]||viewDashboard)();
+}
+
+/* ===================== 计算 ===================== */
+function monthTx(m=curMonth()){return DATA.tx.filter(t=>monthKey(t.date)===m);}
+function sumBy(list,kind){return list.filter(t=>t.kind===kind).reduce((s,t)=>s+t.amount,0);}
+function netWorth(){return DATA.accounts.reduce((s,a)=>s+a.balance,0);}
+/* 按一级分类汇总本月支出:catId 为一级 id,匹配其名下所有二级交易 */
+function catSpend(topId,m=curMonth()){return monthTx(m).filter(t=>t.kind==='exp'&&topOf(t.category)?.id===topId).reduce((s,t)=>s+t.amount,0);}
+
+/* 订阅检测:近90天内,同名/相近金额出现≥2次且间隔约1月 */
+function detectSubs(){
+  const map={};
+  DATA.tx.filter(t=>t.kind==='exp').forEach(t=>{
+    const key=(t.note||'').trim()+'|'+Math.round(t.amount);
+    if(!key.startsWith('|'))(map[key]=map[key]||[]).push(t);
+  });
+  const subs=[];
+  Object.values(map).forEach(arr=>{
+    if(arr.length>=2){
+      arr.sort((a,b)=>a.date.localeCompare(b.date));
+      subs.push({note:arr[0].note,amount:arr[0].amount,count:arr.length,last:arr[arr.length-1].date});
+    }
+  });
+  return subs;
+}
+
+/* ===================== 视图:仪表盘 ===================== */
+let charts={};
+function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};}
+function viewDashboard(){
+  destroyCharts();
+  const mt=monthTx();
+  const inc=sumBy(mt,'inc'),exp=sumBy(mt,'exp'),net=inc-exp;
+  // 上月对比
+  const lm=new Date();lm.setMonth(lm.getMonth()-1);const lmk=lm.toISOString().slice(0,7);
+  const lastExp=sumBy(monthTx(lmk),'exp');
+  const expDelta=lastExp?((exp-lastExp)/lastExp*100):0;
+  // 分类占比(按一级汇总)
+  const byCat={};
+  mt.filter(t=>t.kind==='exp').forEach(t=>{const top=topOf(t.category);if(top)byCat[top.id]=(byCat[top.id]||0)+t.amount;});
+  const catArr=Object.entries(byCat).map(([id,v])=>({cat:catById(id),v})).filter(x=>x.cat).sort((a,b)=>b.v-a.v);
+  const recent=DATA.tx.slice(0,6);
+  const insights=buildInsights(mt,exp,lastExp,catArr);
+
+  $('#main').innerHTML=`
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <div class="page-title">仪表盘</div>
+        <div class="page-sub">${new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long'})} · 概览</div>
+      </div>
+      <button class="btn" onclick="openTxModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>记一笔</button>
+    </div>
+
+    <div class="grid grid-3">
+      <div class="card">
+        <div class="kpi-label">本月净现金流</div>
+        <div class="kpi-value" style="color:${net>=0?'var(--down)':'var(--up)'}">${net>=0?'+':'-'}${fmt(net)}</div>
+        <div class="kpi-delta ${expDelta<=0?'down':'up'}">${lastExp?`支出环比 ${expDelta>=0?'+':''}${expDelta.toFixed(0)}%`:'暂无对比'}</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">本月支出</div>
+        <div class="kpi-value" style="color:var(--up)">${fmt(exp)}</div>
+        <div class="kpi-delta muted">共 ${mt.filter(t=>t.kind==='exp').length} 笔</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">净资产</div>
+        <div class="kpi-value">${fmt(netWorth())}</div>
+        <div class="kpi-delta muted">${DATA.accounts.length} 个账户</div>
+      </div>
+    </div>
+
+    <div class="grid grid-2 mt16">
+      <div class="card">
+        <div class="card-title">支出分类占比</div>
+        ${catArr.length?`<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <div style="width:160px;height:160px;position:relative;flex-shrink:0"><canvas id="pie"></canvas></div>
+          <div style="flex:1;min-width:140px">${catArr.slice(0,6).map(x=>`
+            <div class="between" style="padding:5px 0">
+              <span class="chip-cat"><span class="dot" style="background:${x.cat.color}"></span>${x.cat.name}</span>
+              <span class="num muted">${(x.v/exp*100).toFixed(0)}%</span>
+            </div>`).join('')}</div>
+        </div>`:`<div class="empty">本月暂无支出</div>`}
+      </div>
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="card-title">AI 洞察</div>
+        <div style="display:flex;flex-direction:column;gap:12px;flex:1">
+          ${insights.map(i=>`<div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:16px;flex-shrink:0">${i.icon}</span>
+            <span style="font-size:13px;line-height:1.5">${i.text}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt16">
+      <div class="between" style="margin-bottom:8px">
+        <div class="card-title" style="margin:0">最近交易</div>
+        <a class="pill" href="#tx" onclick="go('tx')">查看全部</a>
+      </div>
+      ${recent.length?recent.map(txRowHtml).join(''):'<div class="empty">还没有记录,点右下角 + 开始记账</div>'}
+    </div>
+  </div>`;
+
+  if(catArr.length){
+    charts.pie=new Chart($('#pie'),{
+      type:'doughnut',
+      data:{labels:catArr.map(x=>x.cat.name),datasets:[{data:catArr.map(x=>x.v),backgroundColor:catArr.map(x=>x.cat.color),borderWidth:0}]},
+      options:{cutout:'68%',plugins:{legend:{display:false}},responsive:true,maintainAspectRatio:false}
+    });
+  }
+}
+function buildInsights(mt,exp,lastExp,catArr){
+  const out=[];
+  if(catArr[0]){out.push({icon:'📊',text:`最大支出来自 <b>${catArr[0].cat.name}</b>,占本月 ${(catArr[0].v/exp*100).toFixed(0)}%(${fmt(catArr[0].v)})。`});}
+  if(lastExp){const d=exp-lastExp;out.push({icon:d>0?'⚠️':'✅',text:d>0?`本月支出比上月多 <b style="color:var(--up)">${fmt(d)}</b>,注意节奏。`:`本月支出比上月少 <b style="color:var(--down)">${fmt(-d)}</b>,保持得不错。`});}
+  // 预算预警
+  const warn=DATA.budgets.filter(b=>b.month===curMonth()).map(b=>({b,c:catById(b.category),sp:catSpend(b.category)})).filter(x=>x.c&&x.sp/x.b.limit>=0.8);
+  if(warn[0]){out.push({icon:'🔔',text:`<b>${warn[0].c.name}</b> 预算已用 ${(warn[0].sp/warn[0].b.limit*100).toFixed(0)}%,接近上限。`});}
+  const subs=detectSubs();
+  if(subs[0]){out.push({icon:'🔁',text:`检测到疑似订阅:<b>${escapeHtml(subs[0].note)}</b>(${fmt(subs[0].amount)}),已出现 ${subs[0].count} 次。`});}
+  if(!out.length)out.push({icon:'🌱',text:'多记几笔,AI 就能帮你发现消费规律。'});
+  return out.slice(0,4);
+}
+function txRowHtml(t){
+  const a=acctById(t.account),col=catColor(t.category);
+  return `<div class="tx-row">
+    <div class="tx-icon" style="background:${col}1a;color:${col}">${catIcon(t.category)}</div>
+    <div class="tx-main">
+      <div class="tx-name">${escapeHtml(t.note||catName(t.category))}</div>
+      <div class="tx-meta">${catFull(t.category)} · ${a?.name||'—'} · ${t.date.slice(5)}</div>
+    </div>
+    <div class="tx-amt ${t.kind}">${t.kind==='exp'?'-':'+'}${fmtNo(t.amount)}</div>
+  </div>`;
+}
+
+/* ===================== 视图:交易 ===================== */
+let txFilter={kind:'all',q:'',cat:'all'};
+function viewTx(){
+  destroyCharts();
+  $('#main').innerHTML=`
+  <div class="page">
+    <div class="page-head">
+      <div><div class="page-title">交易</div><div class="page-sub">共 ${DATA.tx.length} 笔记录</div></div>
+      <div class="flex gap8">
+        <button class="btn-ghost btn btn-sm" onclick="openAI()"><span class="ai-badge">AI</span> 截图记账</button>
+        <button class="btn" onclick="openTxModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>记一笔</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px">
+      <div class="flex gap12 wrap">
+        <div class="seg">
+          ${['all','exp','inc'].map(k=>`<button class="${txFilter.kind===k?'active':''}" onclick="setTxFilter('kind','${k}')">${{all:'全部',exp:'支出',inc:'收入'}[k]}</button>`).join('')}
+        </div>
+        <select class="select" style="width:auto" onchange="setTxFilter('cat',this.value)">
+          <option value="all">所有分类</option>
+          ${topCats().map(top=>`<optgroup label="${top.icon} ${top.name}">
+            <option value="top:${top.id}" ${txFilter.cat==='top:'+top.id?'selected':''}>${top.name}(全部)</option>
+            ${subCats(top.id).map(s=>`<option value="${s.id}" ${txFilter.cat===s.id?'selected':''}>　${s.name}</option>`).join('')}
+          </optgroup>`).join('')}
+        </select>
+        <input class="input" style="flex:1;min-width:160px" placeholder="搜索备注…" value="${escapeHtml(txFilter.q)}" oninput="setTxFilter('q',this.value)">
+      </div>
+    </div>
+
+    <div class="card mt16" id="txList"></div>
+  </div>`;
+  renderTxList();
+}
+function setTxFilter(k,v){txFilter[k]=v;if(k==='kind'||k==='cat')viewTx();else renderTxList();}
+function renderTxList(){
+  let list=DATA.tx.slice();
+  if(txFilter.kind!=='all')list=list.filter(t=>t.kind===txFilter.kind);
+  if(txFilter.cat!=='all'){
+    if(txFilter.cat.startsWith('top:')){const tid=txFilter.cat.slice(4);list=list.filter(t=>topOf(t.category)?.id===tid);}
+    else list=list.filter(t=>t.category===txFilter.cat);
+  }
+  if(txFilter.q){const q=txFilter.q.toLowerCase();list=list.filter(t=>(t.note||'').toLowerCase().includes(q)||catFull(t.category).includes(q));}
+  // 按日期分组
+  const groups={};
+  list.forEach(t=>{(groups[t.date]=groups[t.date]||[]).push(t);});
+  const el=$('#txList');
+  if(!list.length){el.innerHTML='<div class="empty">没有符合条件的交易</div>';return;}
+  el.innerHTML=Object.entries(groups).map(([date,arr])=>{
+    const dayExp=arr.filter(t=>t.kind==='exp').reduce((s,t)=>s+t.amount,0);
+    return `<div style="padding:10px 0 4px" class="between">
+      <span class="faint" style="font-size:12px;font-weight:600">${date} ${['周日','周一','周二','周三','周四','周五','周六'][new Date(date).getDay()]}</span>
+      <span class="faint num" style="font-size:12px">支出 ${fmtNo(dayExp)}</span>
+    </div>`+arr.map(t=>{
+      const a=acctById(t.account),col=catColor(t.category);
+      return `<div class="tx-row" style="cursor:pointer" onclick='openTxModal(${JSON.stringify(t.id)})'>
+        <div class="tx-icon" style="background:${col}1a;color:${col}">${catIcon(t.category)}</div>
+        <div class="tx-main"><div class="tx-name">${escapeHtml(t.note||catName(t.category))}</div>
+          <div class="tx-meta">${catFull(t.category)} · ${a?.name||'—'}${t.tags?.length?' · '+t.tags.map(escapeHtml).join(' '):''}</div></div>
+        <div class="tx-amt ${t.kind}">${t.kind==='exp'?'-':'+'}${fmtNo(t.amount)}</div>
+      </div>`;
+    }).join('');
+  }).join('');
+}
+
+/* ===================== 交易模态 ===================== */
+let editingTx=null;
+function openTxModal(id){
+  editingTx=id?DATA.tx.find(t=>t.id===id):null;
+  const t=editingTx||{kind:'exp',amount:'',category:'',account:DATA.accounts[0]?.id,date:todayISO(),note:'',tags:[]};
+  $('#txModalTitle').textContent=editingTx?'编辑交易':'记一笔';
+  renderTxForm(t);
+  openModal('txModal');
+}
+function renderTxForm(t){
+  const leaves=leafCats(t.kind);
+  if(!leaves.find(c=>c.id===t.category))t.category=leaves[0]?.id;
+  $('#txForm').innerHTML=`
+    <div class="seg" style="width:100%;margin-bottom:16px">
+      <button style="flex:1" class="${t.kind==='exp'?'active':''}" onclick="switchKind('exp')">支出</button>
+      <button style="flex:1" class="${t.kind==='inc'?'active':''}" onclick="switchKind('inc')">收入</button>
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>金额</label>
+      <input class="input" id="f_amount" type="number" inputmode="decimal" placeholder="0.00" style="font-size:22px;font-family:var(--mono)" value="${t.amount||''}">
+    </div>
+    <div class="grid grid-2" style="margin-bottom:14px">
+      <div class="field"><label>分类</label>
+        <select class="select" id="f_cat">${topCats(t.kind).map(top=>`<optgroup label="${top.icon} ${top.name}">${subCats(top.id).map(s=>`<option value="${s.id}" ${s.id===t.category?'selected':''}>${s.name}</option>`).join('')}</optgroup>`).join('')}</select>
+      </div>
+      <div class="field"><label>账户</label>
+        <select class="select" id="f_acc">${DATA.accounts.map(a=>`<option value="${a.id}" ${a.id===t.account?'selected':''}>${a.name}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>日期</label>
+      <input class="input" id="f_date" type="date" value="${t.date}"></div>
+    <div class="field" style="margin-bottom:14px"><label>备注</label>
+      <input class="input" id="f_note" placeholder="例如:午餐·兰州拉面" value="${escapeHtml(t.note||'')}"></div>
+    <div class="field" style="margin-bottom:20px"><label>标签(空格分隔)</label>
+      <input class="input" id="f_tags" placeholder="报销 固定支出" value="${(t.tags||[]).join(' ')}"></div>
+    <div class="flex gap8">
+      <button class="btn" style="flex:1" onclick="saveTx()">保存</button>
+      ${editingTx?`<button class="btn btn-danger" onclick="delTx()">删除</button>`:''}
+    </div>`;
+  setTimeout(()=>$('#f_amount')?.focus(),50);
+}
+function switchKind(k){const t=editingTx||{};t.kind=k;t.amount=$('#f_amount').value;t.note=$('#f_note').value;t.date=$('#f_date').value;renderTxForm(Object.assign({account:$('#f_acc').value},t));}
+async function saveTx(){
+  const amount=parseFloat($('#f_amount').value);
+  if(!amount||amount<=0){toast('请输入有效金额');return;}
+  const rec={
+    id:editingTx?.id||uid(),
+    kind:editingTx?.kind||($('#txForm .seg button.active').textContent==='收入'?'inc':'exp'),
+    amount,category:$('#f_cat').value,account:$('#f_acc').value,date:$('#f_date').value,
+    note:$('#f_note').value.trim(),tags:$('#f_tags').value.trim().split(/\s+/).filter(Boolean),
+    createdAt:editingTx?.createdAt||Date.now()
+  };
+  if(!editingTx||editingTx.kind!==rec.kind){/* kind 从 active 按钮推断已处理 */}
+  // 修正 kind:以 seg active 为准
+  rec.kind=$('#txForm .seg button.active').textContent.includes('收入')?'inc':'exp';
+  // 账户余额调整
+  await applyBalance(rec,editingTx);
+  await dbPut('transactions',rec);
+  await reload();closeModal('txModal');toast(editingTx?'已更新':'已记录');render();
+}
+async function applyBalance(rec,old){
+  if(old){const oa=acctById(old.account);if(oa){oa.balance+=old.kind==='exp'?old.amount:-old.amount;await dbPut('accounts',oa);}}
+  const na=acctById(rec.account);if(na){na.balance+=rec.kind==='exp'?-rec.amount:rec.amount;await dbPut('accounts',na);}
+}
+async function delTx(){
+  if(!editingTx)return;
+  const a=acctById(editingTx.account);if(a){a.balance+=editingTx.kind==='exp'?editingTx.amount:-editingTx.amount;await dbPut('accounts',a);}
+  await dbDel('transactions',editingTx.id);await reload();closeModal('txModal');toast('已删除');render();
+}
+
+/* ===================== 视图:预算 ===================== */
+function viewBudget(){
+  destroyCharts();
+  const budgets=DATA.budgets.filter(b=>b.month===curMonth());
+  const totalLimit=budgets.reduce((s,b)=>s+b.limit,0);
+  const totalSpent=budgets.reduce((s,b)=>s+catSpend(b.category),0);
+  const unbudgeted=topCats('exp').filter(c=>!budgets.find(b=>b.category===c.id));
+  $('#main').innerHTML=`
+  <div class="page">
+    <div class="page-head">
+      <div><div class="page-title">预算</div><div class="page-sub">零基预算 · 给每个分类分配额度</div></div>
+      <button class="btn" onclick="openBudgetModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>添加预算</button>
+    </div>
+    <div class="card">
+      <div class="between" style="margin-bottom:12px">
+        <div><div class="kpi-label">本月总预算</div><div class="num" style="font-size:22px;font-weight:600;margin-top:4px">${fmt(totalSpent)} <span class="faint" style="font-size:14px">/ ${fmt(totalLimit)}</span></div></div>
+        <div class="right"><div class="kpi-label">剩余</div><div class="num" style="font-size:22px;font-weight:600;margin-top:4px;color:${totalLimit-totalSpent>=0?'var(--down)':'var(--up)'}">${fmt(totalLimit-totalSpent)}</div></div>
+      </div>
+      <div class="bar"><div class="bar-fill ${totalSpent>totalLimit?'over':''}" style="width:${Math.min(100,totalLimit?totalSpent/totalLimit*100:0)}%"></div></div>
+    </div>
+    <div class="grid grid-2 mt16">
+      ${budgets.length?budgets.map(b=>{
+        const c=catById(b.category);if(!c)return'';
+        const sp=catSpend(b.category);const pct=b.limit?sp/b.limit*100:0;
+        return `<div class="card" style="cursor:pointer" onclick="openBudgetModal('${b.id}')">
+          <div class="between" style="margin-bottom:10px">
+            <span class="chip-cat" style="font-weight:600"><span class="dot" style="background:${c.color}"></span>${c.icon} ${c.name}</span>
+            <span class="num ${pct>100?'':''}" style="color:${pct>100?'var(--up)':'var(--text-muted)'};font-size:13px">${pct.toFixed(0)}%</span>
+          </div>
+          <div class="bar"><div class="bar-fill ${pct>100?'over':''}" style="width:${Math.min(100,pct)}%"></div></div>
+          <div class="between mt8"><span class="num" style="font-size:14px">${fmt(sp)}</span><span class="faint num" style="font-size:13px">预算 ${fmt(b.limit)}</span></div>
+        </div>`;
+      }).join(''):'<div class="card empty">还没有预算,点右上角添加</div>'}
+    </div>
+    ${unbudgeted.length?`<div class="card mt16"><div class="card-title">未设预算的分类</div><div class="flex gap8 wrap">${unbudgeted.map(c=>`<button class="pill" onclick="openBudgetModal(null,'${c.id}')">${c.icon} ${c.name} +</button>`).join('')}</div></div>`:''}
+  </div>`;
+}
+function openBudgetModal(id,presetCat){
+  const b=id?DATA.budgets.find(x=>x.id===id):{category:presetCat||topCats('exp')[0]?.id,limit:''};
+  $('#genTitle').textContent=id?'编辑预算':'添加预算';
+  const cats=topCats('exp');
+  $('#genBody').innerHTML=`
+    <div class="field" style="margin-bottom:14px"><label>分类(一级)</label>
+      <select class="select" id="b_cat">${cats.map(c=>`<option value="${c.id}" ${c.id===b.category?'selected':''}>${c.icon} ${c.name}</option>`).join('')}</select></div>
+    <div class="field" style="margin-bottom:20px"><label>月度额度</label>
+      <input class="input" id="b_limit" type="number" placeholder="0.00" value="${b.limit||''}" style="font-family:var(--mono)"></div>
+    <div class="flex gap8">
+      <button class="btn" style="flex:1" onclick="saveBudget('${id||''}')">保存</button>
+      ${id?`<button class="btn btn-danger" onclick="delBudget('${id}')">删除</button>`:''}
+    </div>`;
+  openModal('genModal');
+}
+async function saveBudget(id){
+  const limit=parseFloat($('#b_limit').value);if(!limit||limit<=0){toast('请输入额度');return;}
+  await dbPut('budgets',{id:id||uid(),category:$('#b_cat').value,limit,month:curMonth()});
+  await reload();closeModal('genModal');toast('已保存');viewBudget();
+}
+async function delBudget(id){await dbDel('budgets',id);await reload();closeModal('genModal');toast('已删除');viewBudget();}
+
+/* ===================== 视图:账户 ===================== */
+const ACC_TYPES={cash:'现金',bank:'储蓄卡',credit:'信用卡',wallet:'电子钱包',invest:'投资'};
+const ACC_ICON={cash:'💵',bank:'🏦',credit:'💳',wallet:'📱',invest:'📈'};
+function viewAccounts(){
+  destroyCharts();
+  const assets=DATA.accounts.filter(a=>a.balance>=0).reduce((s,a)=>s+a.balance,0);
+  const debts=DATA.accounts.filter(a=>a.balance<0).reduce((s,a)=>s+a.balance,0);
+  $('#main').innerHTML=`
+  <div class="page">
+    <div class="page-head">
+      <div><div class="page-title">账户</div><div class="page-sub">净资产 ${fmt(netWorth())}</div></div>
+      <button class="btn" onclick="openAccModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>添加账户</button>
+    </div>
+    <div class="grid grid-3">
+      <div class="card"><div class="kpi-label">总资产</div><div class="kpi-value" style="color:var(--down)">${fmt(assets)}</div></div>
+      <div class="card"><div class="kpi-label">总负债</div><div class="kpi-value" style="color:var(--up)">${fmt(debts)}</div></div>
+      <div class="card"><div class="kpi-label">净资产</div><div class="kpi-value">${fmt(netWorth())}</div></div>
+    </div>
+    <div class="card mt16">
+      <div class="card-title">账户列表</div>
+      ${DATA.accounts.map(a=>`<div class="tx-row" style="cursor:pointer" onclick="openAccModal('${a.id}')">
+        <div class="tx-icon" style="background:var(--surface-muted)">${ACC_ICON[a.type]||'💰'}</div>
+        <div class="tx-main"><div class="tx-name">${escapeHtml(a.name)}</div><div class="tx-meta">${ACC_TYPES[a.type]||a.type}</div></div>
+        <div class="tx-amt num" style="color:${a.balance>=0?'var(--text)':'var(--up)'}">${a.balance<0?'-':''}${fmtNo(a.balance)}</div>
+      </div>`).join('')}
+    </div>
+    <div class="card mt16">
+      <div class="card-title">储蓄目标</div>
+      <div class="grid grid-2">
+        ${DATA.goals.map(g=>{const pct=g.target?g.saved/g.target*100:0;return`
+          <div style="padding:4px 0;cursor:pointer" onclick="openGoalModal('${g.id}')">
+            <div class="between" style="margin-bottom:8px"><span style="font-weight:600">${g.icon} ${escapeHtml(g.name)}</span><span class="num muted" style="font-size:13px">${pct.toFixed(0)}%</span></div>
+            <div class="bar"><div class="bar-fill" style="width:${Math.min(100,pct)}%"></div></div>
+            <div class="between mt8"><span class="num" style="font-size:13px">${fmt(g.saved)}</span><span class="faint num" style="font-size:13px">目标 ${fmt(g.target)}</span></div>
+          </div>`;}).join('')}
+      </div>
+      <button class="pill mt16" onclick="openGoalModal()">+ 新目标</button>
+    </div>
+  </div>`;
+}
+function openAccModal(id){
+  const a=id?DATA.accounts.find(x=>x.id===id):{name:'',type:'bank',balance:''};
+  $('#genTitle').textContent=id?'编辑账户':'添加账户';
+  $('#genBody').innerHTML=`
+    <div class="field" style="margin-bottom:14px"><label>名称</label><input class="input" id="a_name" value="${escapeHtml(a.name)}" placeholder="例如:招商银行"></div>
+    <div class="field" style="margin-bottom:14px"><label>类型</label><select class="select" id="a_type">${Object.entries(ACC_TYPES).map(([k,v])=>`<option value="${k}" ${k===a.type?'selected':''}>${ACC_ICON[k]} ${v}</option>`).join('')}</select></div>
+    <div class="field" style="margin-bottom:20px"><label>当前余额(信用卡欠款填负数)</label><input class="input" id="a_bal" type="number" value="${a.balance}" style="font-family:var(--mono)"></div>
+    <div class="flex gap8"><button class="btn" style="flex:1" onclick="saveAcc('${id||''}')">保存</button>${id?`<button class="btn btn-danger" onclick="delAcc('${id}')">删除</button>`:''}</div>`;
+  openModal('genModal');
+}
+async function saveAcc(id){
+  const name=$('#a_name').value.trim();if(!name){toast('请输入名称');return;}
+  await dbPut('accounts',{id:id||uid(),name,type:$('#a_type').value,balance:parseFloat($('#a_bal').value)||0});
+  await reload();closeModal('genModal');toast('已保存');viewAccounts();
+}
+async function delAcc(id){
+  if(DATA.tx.some(t=>t.account===id)){toast('该账户已有交易,不能删除');return;}
+  await dbDel('accounts',id);await reload();closeModal('genModal');toast('已删除');viewAccounts();
+}
+function openGoalModal(id){
+  const g=id?DATA.goals.find(x=>x.id===id):{name:'',target:'',saved:'',icon:'🎯'};
+  $('#genTitle').textContent=id?'编辑目标':'新储蓄目标';
+  $('#genBody').innerHTML=`
+    <div class="grid grid-2" style="margin-bottom:14px">
+      <div class="field"><label>图标</label><input class="input" id="g_icon" value="${g.icon}" maxlength="2"></div>
+      <div class="field"><label>名称</label><input class="input" id="g_name" value="${escapeHtml(g.name)}" placeholder="旅行基金"></div>
+    </div>
+    <div class="grid grid-2" style="margin-bottom:20px">
+      <div class="field"><label>目标金额</label><input class="input" id="g_target" type="number" value="${g.target}" style="font-family:var(--mono)"></div>
+      <div class="field"><label>已存</label><input class="input" id="g_saved" type="number" value="${g.saved}" style="font-family:var(--mono)"></div>
+    </div>
+    <div class="flex gap8"><button class="btn" style="flex:1" onclick="saveGoal('${id||''}')">保存</button>${id?`<button class="btn btn-danger" onclick="delGoal('${id}')">删除</button>`:''}</div>`;
+  openModal('genModal');
+}
+async function saveGoal(id){
+  const name=$('#g_name').value.trim();if(!name){toast('请输入名称');return;}
+  await dbPut('goals',{id:id||uid(),name,icon:$('#g_icon').value||'🎯',target:parseFloat($('#g_target').value)||0,saved:parseFloat($('#g_saved').value)||0});
+  await reload();closeModal('genModal');toast('已保存');viewAccounts();
+}
+async function delGoal(id){await dbDel('goals',id);await reload();closeModal('genModal');toast('已删除');viewAccounts();}
+
+/* ===================== 视图:报表 ===================== */
+let reportRange=6;
+function viewReports(){
+  destroyCharts();
+  $('#main').innerHTML=`
+  <div class="page">
+    <div class="page-head">
+      <div><div class="page-title">报表</div><div class="page-sub">趋势与结构分析</div></div>
+      <div class="seg">${[3,6,12].map(n=>`<button class="${reportRange===n?'active':''}" onclick="reportRange=${n};viewReports()">${n}个月</button>`).join('')}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">收支趋势</div>
+      <div style="height:240px"><canvas id="trend"></canvas></div>
+    </div>
+    <div class="grid grid-2 mt16">
+      <div class="card"><div class="card-title">支出分类(近${reportRange}月)</div><div style="height:240px"><canvas id="catBar"></canvas></div></div>
+      <div class="card"><div class="card-title">净资产构成</div><div style="height:240px;display:grid;place-items:center"><div style="width:220px;height:220px"><canvas id="nwPie"></canvas></div></div></div>
+    </div>
+  </div>`;
+  renderReports();
+}
+function lastMonths(n){const arr=[];const d=new Date();d.setDate(1);for(let i=n-1;i>=0;i--){const x=new Date(d);x.setMonth(x.getMonth()-i);arr.push(x.toISOString().slice(0,7));}return arr;}
+function renderReports(){
+  const months=lastMonths(reportRange);
+  const inc=months.map(m=>sumBy(monthTx(m),'inc'));
+  const exp=months.map(m=>sumBy(monthTx(m),'exp'));
+  const css=getComputedStyle(document.body);
+  const cBrand=css.getPropertyValue('--brand').trim(),cDanger=css.getPropertyValue('--danger').trim();
+  const cText=css.getPropertyValue('--text-muted').trim(),cBorder=css.getPropertyValue('--border').trim();
+  const labels=months.map(m=>m.slice(2).replace('-','/'));
+  charts.trend=new Chart($('#trend'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'收入',data:inc,borderColor:cBrand,backgroundColor:cBrand+'22',tension:.35,fill:true,pointRadius:3,borderWidth:2},
+      {label:'支出',data:exp,borderColor:cDanger,backgroundColor:cDanger+'15',tension:.35,fill:true,pointRadius:3,borderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:cText,usePointStyle:true,boxWidth:7}}},
+      scales:{y:{ticks:{color:cText},grid:{color:cBorder}},x:{ticks:{color:cText},grid:{display:false}}}}
+  });
+  // 分类柱(按一级汇总)
+  const byCat={};
+  months.forEach(m=>monthTx(m).filter(t=>t.kind==='exp').forEach(t=>{const top=topOf(t.category);if(top)byCat[top.id]=(byCat[top.id]||0)+t.amount;}));
+  const catArr=Object.entries(byCat).map(([id,v])=>({c:catById(id),v})).filter(x=>x.c).sort((a,b)=>b.v-a.v).slice(0,8);
+  charts.catBar=new Chart($('#catBar'),{
+    type:'bar',
+    data:{labels:catArr.map(x=>x.c.name),datasets:[{data:catArr.map(x=>x.v),backgroundColor:catArr.map(x=>x.c.color),borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:cText},grid:{color:cBorder}},y:{ticks:{color:cText},grid:{display:false}}}}
+  });
+  // 净资产饼
+  const pos=DATA.accounts.filter(a=>a.balance>0);
+  charts.nwPie=new Chart($('#nwPie'),{
+    type:'doughnut',
+    data:{labels:pos.map(a=>a.name),datasets:[{data:pos.map(a=>a.balance),backgroundColor:['#0B5E42','#2C7873','#D98324','#8E44AD','#0277BD','#607D8B'],borderWidth:0}]},
+    options:{cutout:'62%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:cText,usePointStyle:true,boxWidth:7,font:{size:11}}}}}
+  });
+}
+
+/* ===================== 视图:设置 ===================== */
+function viewSettings(){
+  destroyCharts();
+  $('#main').innerHTML=`
+  <div class="page">
+    <div class="page-head"><div><div class="page-title">设置</div><div class="page-sub">AI、分类、数据管理</div></div></div>
+
+    <div class="card">
+      <div class="card-title">AI 截图记账(OpenRouter)</div>
+      <div class="field" style="margin-bottom:14px"><label>API Key</label>
+        <input class="input" id="s_key" type="password" placeholder="sk-or-..." value="${escapeHtml(cfg.apiKey)}"></div>
+      <div class="grid grid-2" style="margin-bottom:14px">
+        <div class="field"><label>模型 ID(需支持视觉)</label>
+          <input class="input" id="s_model" value="${escapeHtml(cfg.model)}" placeholder="deepseek/deepseek-v4.1-flash-1017"></div>
+        <div class="field"><label>API 地址</label>
+          <input class="input" id="s_base" value="${escapeHtml(cfg.apiBase)}"></div>
+      </div>
+      <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:14px">
+        截图记账需要<b>支持视觉输入</b>的模型。当前已配置 <code>deepseek/deepseek-v4.1-flash-1017</code>。若该模型报不支持图片,换成其他视觉模型 slug(如 <code>google/gemini-flash-1.5</code>、<code>qwen/qwen2.5-vl-72b-instruct</code>)即可。
+      </div>
+      <button class="btn" onclick="saveAICfg()">保存 AI 配置</button>
+    </div>
+
+    <div class="card mt16">
+      <div class="between" style="margin-bottom:12px"><div class="card-title" style="margin:0">分类管理</div><button class="pill" onclick="openTopCatModal()">+ 一级分类</button></div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        ${topCats().map(top=>`<div>
+          <div class="between" style="margin-bottom:8px">
+            <button class="chip-cat" style="font-weight:600;cursor:pointer" onclick="openTopCatModal('${top.id}')"><span class="dot" style="background:${top.color}"></span>${top.icon} ${top.name} <span class="faint" style="font-weight:400;font-size:12px">${top.kind==='exp'?'支出':'收入'}</span></button>
+            <button class="pill" style="font-size:12px;padding:3px 10px" onclick="openSubCatModal(null,'${top.id}')">+ 二级</button>
+          </div>
+          <div class="flex gap8 wrap" style="padding-left:14px">
+            ${subCats(top.id).map(s=>`<button class="tag" style="cursor:pointer" onclick="openSubCatModal('${s.id}','${top.id}')">${s.name}</button>`).join('')||'<span class="faint" style="font-size:12px">暂无二级</span>'}
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card mt16">
+      <div class="card-title">通用</div>
+      <div class="field" style="margin-bottom:14px;max-width:200px"><label>货币符号</label><input class="input" id="s_cur" value="${cfg.currency}" maxlength="3"></div>
+      <button class="btn-ghost btn btn-sm" onclick="cfg.currency=$('#s_cur').value||'¥';saveCfg();toast('已保存');render()">保存</button>
+    </div>
+
+    <div class="card mt16">
+      <div class="card-title">数据管理(本地 · 不上传)</div>
+      <div class="flex gap8 wrap">
+        <button class="btn-ghost btn btn-sm" onclick="exportJSON()">导出 JSON 备份</button>
+        <button class="btn-ghost btn btn-sm" onclick="exportCSV()">导出交易 CSV</button>
+        <label class="btn-ghost btn btn-sm" style="cursor:pointer">导入 JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(this)"></label>
+        <button class="btn btn-danger" onclick="resetAll()">清空所有数据</button>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:12px">所有数据存储在浏览器本地(IndexedDB),不经过任何服务器。换设备或清缓存前请先导出备份。</div>
+    </div>
+  </div>`;
+}
+function saveAICfg(){cfg.apiKey=$('#s_key').value.trim();cfg.model=$('#s_model').value.trim();cfg.apiBase=$('#s_base').value.trim();saveCfg();toast('AI 配置已保存');}
+// 一级分类(有图标/颜色/收支类型)
+function openTopCatModal(id){
+  const c=id?catById(id):{name:'',kind:'exp',color:'#0B5E42',icon:'🏷️',parent:null};
+  $('#genTitle').textContent=id?'编辑一级分类':'新一级分类';
+  $('#genBody').innerHTML=`
+    <div class="grid grid-2" style="margin-bottom:14px">
+      <div class="field"><label>图标</label><input class="input" id="c_icon" value="${c.icon}" maxlength="2"></div>
+      <div class="field"><label>名称</label><input class="input" id="c_name" value="${escapeHtml(c.name)}"></div>
+    </div>
+    <div class="grid grid-2" style="margin-bottom:20px">
+      <div class="field"><label>类型</label><select class="select" id="c_kind" ${id?'disabled':''}><option value="exp" ${c.kind==='exp'?'selected':''}>支出</option><option value="inc" ${c.kind==='inc'?'selected':''}>收入</option></select></div>
+      <div class="field"><label>颜色</label><input class="input" id="c_color" type="color" value="${c.color}" style="height:42px;padding:3px"></div>
+    </div>
+    <div class="flex gap8"><button class="btn" style="flex:1" onclick="saveTopCat('${id||''}')">保存</button>${id?`<button class="btn btn-danger" onclick="delTopCat('${id}')">删除</button>`:''}</div>`;
+  openModal('genModal');
+}
+async function saveTopCat(id){
+  const name=$('#c_name').value.trim();if(!name){toast('请输入名称');return;}
+  const kind=id?catById(id).kind:$('#c_kind').value;
+  await dbPut('categories',{id:id||uid(),name,kind,color:$('#c_color').value,icon:$('#c_icon').value||'🏷️',parent:null});
+  await reload();closeModal('genModal');toast('已保存');viewSettings();
+}
+async function delTopCat(id){
+  if(subCats(id).some(s=>DATA.tx.some(t=>t.category===s.id))){toast('该分类下已有交易,不能删除');return;}
+  if(DATA.budgets.some(b=>b.category===id)){toast('该分类有预算,请先删预算');return;}
+  for(const s of subCats(id))await dbDel('categories',s.id);
+  await dbDel('categories',id);await reload();closeModal('genModal');toast('已删除');viewSettings();
+}
+// 二级分类(只有名称,归属某一级)
+function openSubCatModal(id,topId){
+  const c=id?catById(id):{name:'',parent:topId};
+  const top=catById(c.parent);
+  $('#genTitle').textContent=id?'编辑二级分类':'新二级分类';
+  $('#genBody').innerHTML=`
+    <div class="field" style="margin-bottom:14px"><label>所属一级</label>
+      <select class="select" id="sc_parent">${topCats(top?.kind).map(t=>`<option value="${t.id}" ${t.id===c.parent?'selected':''}>${t.icon} ${t.name}</option>`).join('')}</select></div>
+    <div class="field" style="margin-bottom:20px"><label>名称</label><input class="input" id="sc_name" value="${escapeHtml(c.name)}" placeholder="例如:奶茶"></div>
+    <div class="flex gap8"><button class="btn" style="flex:1" onclick="saveSubCat('${id||''}')">保存</button>${id?`<button class="btn btn-danger" onclick="delSubCat('${id}')">删除</button>`:''}</div>`;
+  openModal('genModal');
+}
+async function saveSubCat(id){
+  const name=$('#sc_name').value.trim();if(!name){toast('请输入名称');return;}
+  const parent=$('#sc_parent').value,kind=catById(parent).kind;
+  await dbPut('categories',{id:id||uid(),name,kind,parent});
+  await reload();closeModal('genModal');toast('已保存');viewSettings();
+}
+async function delSubCat(id){
+  if(DATA.tx.some(t=>t.category===id)){toast('该分类已有交易,不能删除');return;}
+  await dbDel('categories',id);await reload();closeModal('genModal');toast('已删除');viewSettings();
+}
+
+/* ===================== 数据导入导出 ===================== */
+async function exportJSON(){
+  const dump={version:1,exportedAt:new Date().toISOString(),cfg:{currency:cfg.currency},data:DATA};
+  download('moji-backup-'+todayISO()+'.json',JSON.stringify(dump,null,2),'application/json');
+  toast('已导出备份');
+}
+function exportCSV(){
+  const rows=[['日期','类型','一级分类','二级分类','账户','金额','备注','标签']];
+  DATA.tx.forEach(t=>rows.push([t.date,t.kind==='exp'?'支出':'收入',topOf(t.category)?.name||'',catName(t.category),acctById(t.account)?.name||'',t.amount,t.note||'',(t.tags||[]).join(' ')]));
+  const csv='\ufeff'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  download('moji-交易-'+todayISO()+'.csv',csv,'text/csv');toast('已导出 CSV');
+}
+function download(name,content,type){
+  const b=new Blob([content],{type});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
+}
+function importJSON(input){
+  const f=input.files[0];if(!f)return;const r=new FileReader();
+  r.onload=async()=>{
+    try{
+      const d=JSON.parse(r.result).data;
+      if(!d||!d.tx){toast('文件格式不对');return;}
+      for(const s of['transactions','accounts','categories','budgets','goals'])await dbClear(s);
+      for(const t of d.tx)await dbPut('transactions',t);
+      for(const a of d.accounts)await dbPut('accounts',a);
+      for(const c of d.categories)await dbPut('categories',c);
+      for(const b of(d.budgets||[]))await dbPut('budgets',b);
+      for(const g of(d.goals||[]))await dbPut('goals',g);
+      await reload();toast('导入成功');render();
+    }catch(e){toast('导入失败:'+e.message);}
+  };
+  r.readAsText(f);
+}
+async function resetAll(){
+  $('#genTitle').textContent='确认清空';
+  $('#genBody').innerHTML=`<p class="muted" style="margin-bottom:20px">将删除所有交易、账户、分类、预算和目标,且不可恢复。建议先导出备份。</p>
+    <div class="flex gap8"><button class="btn btn-danger" style="flex:1;background:var(--danger);color:#fff" onclick="doReset()">确认清空</button><button class="btn-ghost btn" onclick="closeModal('genModal')">取消</button></div>`;
+  openModal('genModal');
+}
+async function doReset(){
+  // 软删除所有现有记录(生成墓碑,使云端同步删除),再清本地、重新播种
+  for(const s of SYNC_STORES){
+    const all=await dbAll(s);
+    for(const rec of all){if(!rec.deleted)await dbDel(s,rec.id);}
+  }
+  await seedAll();closeModal('genModal');toast('已重置');go('dashboard');queueSync();
+}
+
+/* ===================== AI 截图记账 ===================== */
+function openAI(){
+  if(!cfg.apiKey){
+    $('#aiModalBody').innerHTML=`<div class="empty" style="padding:20px">
+      <p style="margin-bottom:16px">还没配置 AI。请先到设置填入 OpenRouter API Key 和视觉模型。</p>
+      <button class="btn" onclick="closeModal('aiModal');go('settings')">去设置</button></div>`;
+    openModal('aiModal');return;
+  }
+  $('#aiModalBody').innerHTML=`
+    <div class="ai-badge" style="margin-bottom:14px">视觉识别 · ${escapeHtml(cfg.model)}</div>
+    <div class="drop" id="drop" onclick="$('#aiFile').click()">
+      <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 16l4-4 4 4 4-6 4 6M4 20h16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div style="font-weight:600;margin-bottom:4px">上传账单截图 / 小票 / 发票</div>
+      <div class="muted" style="font-size:13px">支付宝、微信账单截图,或拍照的纸质小票</div>
+      <input type="file" id="aiFile" accept="image/*" style="display:none" onchange="handleAIFile(this.files[0])">
+    </div>
+    <div id="aiResult" style="margin-top:16px"></div>`;
+  openModal('aiModal');
+  const drop=$('#drop');
+  ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',ev=>{const f=ev.dataTransfer.files[0];if(f)handleAIFile(f);});
+}
+async function handleAIFile(file){
+  if(!file||!file.type.startsWith('image/')){toast('请上传图片');return;}
+  const b64=await fileToB64(file);
+  $('#aiResult').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span>AI 正在识别账单…</span></div>`;
+  try{
+    const items=await callVision(b64,file.type);
+    renderAIResult(items);
+  }catch(e){
+    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">识别失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">检查 API Key / 模型是否支持视觉 / 网络。</span></div>`;
+  }
+}
+function fileToB64(file){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file);});}
+async function callVision(dataUrl){
+  const catList=leafCats().map(c=>c.name).join('、');
+  const prompt=`你是记账助手。识别这张中文账单/小票/支付截图里的所有消费条目。只返回 JSON,格式:
+{"items":[{"amount":数字,"merchant":"商家或说明","date":"YYYY-MM-DD","kind":"exp或inc","category":"从[${catList}]中选最合适的二级分类"}]}
+规则:amount 为正数;date 识别不到用今天;category 必须精确等于给定列表里的某一项;不要解释,只输出 JSON。`;
+  const body={
+    model:cfg.model,
+    messages:[{role:'user',content:[
+      {type:'text',text:prompt},
+      {type:'image_url',image_url:{url:dataUrl}}
+    ]}],
+    max_tokens:3000
+  };
+  const res=await fetch(cfg.apiBase,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey,'HTTP-Referer':location.origin,'X-Title':'MojiJournal'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){throw new Error('HTTP '+res.status+' '+(await res.text()).slice(0,120));}
+  const j=await res.json();
+  const msg=j.choices?.[0]?.message||{};
+  // 推理模型:正文可能在 content,也可能被截断后残留在 reasoning;两处都取来找 JSON
+  let txt=(msg.content||'')+'\n'+(msg.reasoning||'');
+  if(!txt.trim())throw new Error('模型无返回,可能被内容过滤或超时');
+  const parsed=extractJSON(txt);
+  if(!parsed)throw new Error('未能从返回中解析出账单数据');
+  const rawItems=Array.isArray(parsed.items)?parsed.items:(parsed.amount!=null?[parsed]:[]);
+  return rawItems.map(it=>{
+    const kind=it.kind==='inc'?'inc':'exp';
+    // 先精确匹配二级名,再模糊包含,最后兜底该 kind 第一个二级
+    const leaf=leafCats(kind).find(c=>c.name===it.category)
+      ||leafCats(kind).find(c=>it.category&&(c.name.includes(it.category)||String(it.category).includes(c.name)))
+      ||leafCats(kind)[0];
+    return {
+      amount:Math.abs(parseFloat(it.amount))||0,
+      merchant:it.merchant||it.note||'',
+      date:/^\d{4}-\d{2}-\d{2}$/.test(it.date)?it.date:todayISO(),
+      kind,
+      category:leaf?.id
+    };
+  }).filter(it=>it.amount>0&&it.category);
+}
+// 从可能含代码块/推理过程的文本里稳健提取 JSON 对象
+function extractJSON(txt){
+  // 1) 优先匹配 ```json ... ``` 代码块
+  const fence=txt.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidates=[];
+  if(fence)candidates.push(fence[1]);
+  // 2) 含 "items" 的对象优先
+  const itemsMatch=txt.match(/\{[\s\S]*?"items"[\s\S]*\}/);
+  if(itemsMatch)candidates.push(itemsMatch[0]);
+  // 3) 最后一个大括号块(推理模型常把最终答案放最后)
+  const all=[...txt.matchAll(/\{[\s\S]*?\}/g)].map(m=>m[0]);
+  if(all.length)candidates.push(all[all.length-1],all[0]);
+  for(const c of candidates){
+    try{const o=JSON.parse(c);if(o&&typeof o==='object')return o;}catch(e){}
+  }
+  // 4) 贪婪抓取首尾大括号再试
+  const s=txt.indexOf('{'),e=txt.lastIndexOf('}');
+  if(s>=0&&e>s){try{return JSON.parse(txt.slice(s,e+1));}catch(e){}}
+  return null;
+}
+let aiItems=[];
+function renderAIResult(items){
+  aiItems=items;
+  if(!items.length){$('#aiResult').innerHTML='<div class="card empty">没识别到有效条目,换张清晰的图试试</div>';return;}
+  $('#aiResult').innerHTML=`
+    <div class="muted" style="font-size:13px;margin-bottom:10px">识别到 ${items.length} 笔,确认或调整后入账:</div>
+    ${items.map((it,i)=>`<div class="card" style="margin-bottom:10px;padding:14px">
+      <div class="grid grid-2" style="gap:10px">
+        <div class="field"><label>金额</label><input class="input" value="${it.amount}" type="number" onchange="aiItems[${i}].amount=parseFloat(this.value)" style="font-family:var(--mono)"></div>
+        <div class="field"><label>分类</label><select class="select" onchange="aiItems[${i}].category=this.value">${topCats(it.kind).map(top=>`<optgroup label="${top.icon} ${top.name}">${subCats(top.id).map(s=>`<option value="${s.id}" ${s.id===it.category?'selected':''}>${s.name}</option>`).join('')}</optgroup>`).join('')}</select></div>
+      </div>
+      <div class="grid grid-2" style="gap:10px;margin-top:10px">
+        <div class="field"><label>说明</label><input class="input" value="${escapeHtml(it.merchant)}" onchange="aiItems[${i}].merchant=this.value"></div>
+        <div class="field"><label>日期</label><input class="input" type="date" value="${it.date}" onchange="aiItems[${i}].date=this.value"></div>
+      </div>
+    </div>`).join('')}
+    <div class="field" style="margin:10px 0 16px"><label>入账账户</label><select class="select" id="ai_acc">${DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
+    <button class="btn" style="width:100%" onclick="confirmAI()">全部入账(${items.length}笔)</button>`;
+}
+async function confirmAI(){
+  const acc=$('#ai_acc').value;
+  for(const it of aiItems){
+    const rec={id:uid(),kind:it.kind,amount:it.amount,category:it.category,account:acc,date:it.date,note:it.merchant,tags:['AI'],createdAt:Date.now()};
+    await applyBalance(rec,null);
+    await dbPut('transactions',rec);
+  }
+  await reload();closeModal('aiModal');toast(`已入账 ${aiItems.length} 笔`);render();
+}
+
+/* ===================== 模态/主题/菜单 ===================== */
+function openModal(id){$('#'+id).classList.add('open');}
+function closeModal(id){$('#'+id).classList.remove('open');}
+$$('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+function toggleTheme(){cfg.theme=cfg.theme==='dark'?'light':'dark';applyTheme();saveCfg();}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme',cfg.theme);
+  $('#themeLabel').textContent=cfg.theme==='dark'?'浅色模式':'深色模式';
+  if(['reports','dashboard'].includes(curRoute))render();
+}
+function toggleMenu(force){
+  const sb=$('#sidebar'),sc=$('#scrim');
+  const open=force!==undefined?force:!sb.classList.contains('open');
+  sb.classList.toggle('open',open);sc.classList.toggle('open',open);
+}
+
+/* ===================== 启动 ===================== */
+(async function init(){
+  await openDB();
+  await reload();
+  let existing=(await dbAll('accounts')).filter(x=>!x.deleted);
+  // 本地为空:可能是换了新设备 —— 先尝试从云端拉取,避免重复播种
+  if(!existing.length&&navigator.onLine){
+    try{await pullInitial();}catch(e){}
+    await reload();
+    existing=(await dbAll('accounts')).filter(x=>!x.deleted);
+  }
+  // 云端也空 = 真·首次使用 —— 播种(会自动标脏并推送到云端)
+  if(!existing.length)await seedAll();
+  await reload();
+  const h=location.hash.slice(1);
+  if(h&&ROUTES.some(r=>r[0]===h))curRoute=h;
+  applyTheme();
+  renderNav();
+  render();
+  setupPWA();
+  // 启动后台增量同步 + 网络恢复/回到前台自动同步
+  setTimeout(syncNow,800);
+  window.addEventListener('online',syncNow);
+  window.addEventListener('offline',()=>setSyncStatus('offline'));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
+})();
+// 首次拉取:只把云端数据写入本地,不触发渲染(此时 UI 尚未就绪)
+async function pullInitial(){
+  const meta=syncMeta();
+  const res=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({since:meta.since,changes:[]})});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const out=await res.json();
+  await applyRemote(out.records||[]);
+  setSyncMeta({since:out.now});
+}
+
+/* ===================== PWA(单文件内联) ===================== */
+function setupPWA(){
+  // 1) 动态注入 manifest(Blob URL,保持单文件)
+  const icon="data:image/svg+xml,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='512' height='512' rx='112' fill='#0B5E42'/><text x='256' y='350' font-size='280' font-family='PingFang SC,sans-serif' fill='white' text-anchor='middle'>墨</text></svg>");
+  const manifest={
+    name:"墨记 · 极简记账",short_name:"墨记",
+    start_url:".",scope:".",display:"standalone",orientation:"portrait",
+    background_color:"#FBFBFA",theme_color:"#0B5E42",
+    description:"极简个人记账,AI 截图记账,数据本地存储",
+    icons:[
+      {src:icon,sizes:"192x192",type:"image/svg+xml",purpose:"any"},
+      {src:icon,sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}
+    ]
+  };
+  const mBlob=new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"});
+  const link=document.createElement("link");
+  link.rel="manifest";link.href=URL.createObjectURL(mBlob);
+  document.head.appendChild(link);
+
+  // 2) 注册 Service Worker(需 https/localhost;file:// 或纯本地双击会静默跳过)
+  // SW 必须来自真实 http(s) 脚本文件(Chrome 不允许 blob/data URL 注册),故用同目录 sw.js
+  if(!("serviceWorker"in navigator))return;
+  if(location.protocol!=="https:"&&location.hostname!=="localhost"&&location.hostname!=="127.0.0.1")return;
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
