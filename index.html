@@ -744,6 +744,7 @@ function viewTx(){
     <div class="page-head">
       <div><div class="page-title">交易</div><div class="page-sub">共 ${DATA.tx.length} 笔记录</div></div>
       <div class="flex gap8">
+        <button class="btn-ghost btn btn-sm" onclick="openVoice()"><span class="ai-badge">AI</span> 语音记账</button>
         <button class="btn-ghost btn btn-sm" onclick="openAI()"><span class="ai-badge">AI</span> 截图记账</button>
         <button class="btn" onclick="openTxModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>记一笔</button>
       </div>
@@ -1324,21 +1325,34 @@ function extractJSON(txt){
 let aiItems=[];
 function renderAIResult(items){
   aiItems=items;
-  if(!items.length){$('#aiResult').innerHTML='<div class="card empty">没识别到有效条目,换张清晰的图试试</div>';return;}
+  if(!items.length){$('#aiResult').innerHTML='<div class="card empty">没识别到有效条目,换张清晰的图/再说一遍试试</div>';return;}
+  const needConfirm=items.filter(it=>it.question).length;
   $('#aiResult').innerHTML=`
-    <div class="muted" style="font-size:13px;margin-bottom:10px">识别到 ${items.length} 笔,确认或调整后入账:</div>
-    ${items.map((it,i)=>`<div class="card" style="margin-bottom:10px;padding:14px">
+    <div class="muted" style="font-size:13px;margin-bottom:10px">识别到 ${items.length} 笔${needConfirm?`,其中 <b style="color:var(--warning)">${needConfirm} 笔需你确认</b>`:''},核对后入账:</div>
+    ${items.map((it,i)=>`<div class="card" style="margin-bottom:10px;padding:14px;${it.question?'border-color:var(--warning)':''}">
+      ${it.question?`<div style="display:flex;gap:8px;align-items:flex-start;background:var(--surface-muted);border-radius:8px;padding:8px 10px;margin-bottom:10px">
+        <span style="flex-shrink:0">❓</span><span style="font-size:13px;line-height:1.5">${escapeHtml(it.question)}</span></div>`:''}
       <div class="grid grid-2" style="gap:10px">
         <div class="field"><label>金额</label><input class="input" value="${it.amount}" type="number" onchange="aiItems[${i}].amount=parseFloat(this.value)" style="font-family:var(--mono)"></div>
-        <div class="field"><label>分类</label><select class="select" onchange="aiItems[${i}].category=this.value">${topCats(it.kind).map(top=>`<optgroup label="${top.icon} ${top.name}">${subCats(top.id).map(s=>`<option value="${s.id}" ${s.id===it.category?'selected':''}>${s.name}</option>`).join('')}</optgroup>`).join('')}</select></div>
+        <div class="field"><label>收/支</label><select class="select" onchange="aiSetKind(${i},this.value)">
+          <option value="exp" ${it.kind==='exp'?'selected':''}>支出</option><option value="inc" ${it.kind==='inc'?'selected':''}>收入</option></select></div>
       </div>
       <div class="grid grid-2" style="gap:10px;margin-top:10px">
-        <div class="field"><label>说明</label><input class="input" value="${escapeHtml(it.merchant)}" onchange="aiItems[${i}].merchant=this.value"></div>
+        <div class="field"><label>分类</label><select class="select" id="aicat${i}" onchange="aiItems[${i}].category=this.value">${topCats(it.kind).map(top=>`<optgroup label="${top.icon} ${top.name}">${subCats(top.id).map(s=>`<option value="${s.id}" ${s.id===it.category?'selected':''}>${s.name}</option>`).join('')}</optgroup>`).join('')}</select></div>
         <div class="field"><label>日期</label><input class="input" type="date" value="${it.date}" onchange="aiItems[${i}].date=this.value"></div>
       </div>
+      <div class="field" style="margin-top:10px"><label>说明</label><input class="input" value="${escapeHtml(it.merchant)}" onchange="aiItems[${i}].merchant=this.value"></div>
     </div>`).join('')}
     <div class="field" style="margin:10px 0 16px"><label>入账账户</label><select class="select" id="ai_acc">${DATA.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
     <button class="btn" style="width:100%" onclick="confirmAI()">全部入账(${items.length}笔)</button>`;
+}
+// 切换收/支时联动刷新分类下拉(收入/支出分类不同)
+function aiSetKind(i,kind){
+  aiItems[i].kind=kind;
+  const leaves=leafCats(kind);
+  if(!leaves.find(c=>c.id===aiItems[i].category))aiItems[i].category=leaves[0]?.id;
+  const sel=$('#aicat'+i);
+  if(sel)sel.innerHTML=topCats(kind).map(top=>`<optgroup label="${top.icon} ${top.name}">${subCats(top.id).map(s=>`<option value="${s.id}" ${s.id===aiItems[i].category?'selected':''}>${s.name}</option>`).join('')}</optgroup>`).join('');
 }
 async function confirmAI(){
   const acc=$('#ai_acc').value;
@@ -1350,9 +1364,116 @@ async function confirmAI(){
   await reload();closeModal('aiModal');toast(`已入账 ${aiItems.length} 笔`);render();
 }
 
+/* ===================== AI 语音记账 ===================== */
+let recog=null,recogText='';
+function openVoice(){
+  if(!cfg.apiKey){
+    $('#aiModalBody').innerHTML=`<div class="empty" style="padding:20px">
+      <p style="margin-bottom:16px">还没配置 AI。请先到设置填入 OpenRouter API Key 和模型。</p>
+      <button class="btn" onclick="closeModal('aiModal');go('settings')">去设置</button></div>`;
+    openModal('aiModal');return;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const supported=!!SR;
+  $('#aiModalBody').innerHTML=`
+    <div class="ai-badge" style="margin-bottom:14px">语音记账 · ${escapeHtml(cfg.model)}</div>
+    <div style="text-align:center;padding:8px 0 4px">
+      <button id="micBtn" class="fab" style="position:static;margin:0 auto;width:72px;height:72px" onclick="toggleRecord()">
+        <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:30px;height:30px"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 19v3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div id="micHint" class="muted" style="font-size:13px;margin-top:12px">${supported?'点麦克风开始说,例如:<br>"打车30,午饭45,给同事转了200"':'此浏览器不支持语音,请在下方直接输入文字'}</div>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label>${supported?'识别文字(可编辑修正)':'输入消费内容'}</label>
+      <textarea class="input" id="voiceText" style="min-height:70px" placeholder="例如:今天打车花了30,中午吃饭45,给同事转了200"></textarea>
+    </div>
+    <button class="btn" style="width:100%;margin-top:4px" onclick="parseVoiceText()">AI 拆账</button>
+    <div id="aiResult" style="margin-top:16px"></div>`;
+  openModal('aiModal');
+  recogText='';
+}
+function toggleRecord(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('浏览器不支持语音');return;}
+  if(recog){stopRecord();return;}
+  recog=new SR();
+  recog.lang='zh-CN';recog.continuous=true;recog.interimResults=true;
+  recogText=$('#voiceText').value||'';
+  const base=recogText;
+  recog.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal)recogText+=t;else interim+=t;
+    }
+    $('#voiceText').value=recogText+interim;
+  };
+  recog.onerror=e=>{toast('语音出错:'+e.error);stopRecord();};
+  recog.onend=()=>{if(recog){recog=null;updateMicUI(false);}};
+  recog.start();updateMicUI(true);
+}
+function stopRecord(){if(recog){const r=recog;recog=null;try{r.stop();}catch(e){}}updateMicUI(false);}
+function updateMicUI(on){
+  const btn=$('#micBtn'),hint=$('#micHint');
+  if(btn)btn.style.background=on?'var(--danger)':'var(--brand)';
+  if(hint)hint.textContent=on?'正在聆听…再次点击停止':'点麦克风开始说';
+}
+async function parseVoiceText(){
+  stopRecord();
+  const text=$('#voiceText').value.trim();
+  if(!text){toast('请先说话或输入文字');return;}
+  $('#aiResult').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span>AI 正在拆分账目…</span></div>`;
+  try{
+    const items=await callTextParse(text);
+    renderAIResult(items);
+  }catch(e){
+    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">拆账失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">检查 API Key / 模型 / 网络。</span></div>`;
+  }
+}
+// 把一段自然语言拆成多笔账,低置信度给出 question 反问
+async function callTextParse(text){
+  const catList=leafCats().map(c=>c.name).join('、');
+  const prompt=`你是记账助手。用户用口语描述了一段消费/收入,可能包含多笔。请拆成结构化账目。
+今天是 ${todayISO()}。只返回 JSON,格式:
+{"items":[{"amount":数字,"merchant":"简短说明","date":"YYYY-MM-DD","kind":"exp或inc","category":"从[${catList}]里选最合适的","confidence":0到1,"question":"仅当你不确定时填一句要向用户确认的问题,否则留空字符串"}]}
+规则:
+- amount 取正数;金额/分类/收支拿不准时,confidence 给低分(<0.6)并在 question 里用一句话问用户。
+- 典型需要确认的情况:分不清是支出还是转账给别人、是否借出、金额听不清、分类模糊。
+- date 没提到就用今天;category 必须精确等于列表里的某一项。
+- 不要编造没提到的账目。不要解释,只输出 JSON。
+用户说:「${text}」`;
+  const body={model:cfg.model,messages:[{role:'user',content:prompt}],max_tokens:3000};
+  const res=await fetch(cfg.apiBase,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey,'HTTP-Referer':location.origin,'X-Title':'MojiJournal'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){throw new Error('HTTP '+res.status+' '+(await res.text()).slice(0,120));}
+  const j=await res.json();
+  const msg=j.choices?.[0]?.message||{};
+  let txt=(msg.content||'')+'\n'+(msg.reasoning||'');
+  if(!txt.trim())throw new Error('模型无返回');
+  const parsed=extractJSON(txt);
+  if(!parsed)throw new Error('未能解析出账目,换种说法再试');
+  const rawItems=Array.isArray(parsed.items)?parsed.items:(parsed.amount!=null?[parsed]:[]);
+  return rawItems.map(it=>{
+    const kind=it.kind==='inc'?'inc':'exp';
+    const leaf=leafCats(kind).find(c=>c.name===it.category)
+      ||leafCats(kind).find(c=>it.category&&(c.name.includes(it.category)||String(it.category).includes(c.name)))
+      ||leafCats(kind)[0];
+    const conf=typeof it.confidence==='number'?it.confidence:1;
+    return {
+      amount:Math.abs(parseFloat(it.amount))||0,
+      merchant:it.merchant||it.note||'',
+      date:/^\d{4}-\d{2}-\d{2}$/.test(it.date)?it.date:todayISO(),
+      kind,category:leaf?.id,
+      question:(it.question&&String(it.question).trim())||(conf<0.6?'这笔我不太确定,请核对金额和分类':'')
+    };
+  }).filter(it=>it.amount>0&&it.category);
+}
 /* ===================== 模态/主题/菜单 ===================== */
 function openModal(id){$('#'+id).classList.add('open');}
-function closeModal(id){$('#'+id).classList.remove('open');}
+function closeModal(id){if(id==='aiModal')stopRecord();$('#'+id).classList.remove('open');}
 $$('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
 function toggleTheme(){cfg.theme=cfg.theme==='dark'?'light':'dark';applyTheme();saveCfg();}
 function applyTheme(){
