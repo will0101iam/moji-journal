@@ -1,6 +1,6 @@
 # 墨记 · 部署指南
 
-一个本地优先 + 云同步的个人记账 PWA。数据存在你设备本地(秒开、离线可用),同时自动同步到你自己的 Cloudflare D1 云数据库,实现多设备共享。靠 Cloudflare Access 加密码,只有你能访问。
+一个本地优先 + 云同步的个人记账 PWA。数据存在你设备本地(秒开、离线可用),同时自动同步到你自己的 Cloudflare D1 云数据库,实现多设备共享。内置密码门(输一次本设备记住),只有你能访问。
 
 ## 文件说明
 
@@ -56,27 +56,26 @@
 
 > `wrangler.toml` 里的 `database_id` 占位符在走 Pages 控制台绑定时可忽略;若你改用命令行 wrangler 部署,则需把它替换成第 2 步复制的真实 ID。
 
-### 第 5 步:开启 Cloudflare Access 密码保护(方案 B)
+### 第 5 步:设置密码环境变量(保护后端接口)
 
-1. 左侧 **Zero Trust**(首次进入按引导建一个免费 team,选 Free 方案)
-2. **Access → Applications → Add an application → Self-hosted**
-3. 配置:
-   - Application name:`墨记`
-   - Session Duration:选长一点,如 **1 month**(免得老要登录)
-   - Application domain:填你的 Pages 域名,如 `moji-journal.pages.dev`
-4. **Add policy**:
-   - Policy name:`只有我`
-   - Action:**Allow**
-   - Include → **Emails** → 填你自己的邮箱
-5. 保存。以后打开这个网址,会先要求邮箱验证码登录,**只有你的邮箱能进**。
+app 已内置密码门:打开要输密码 `7564`,输一次本设备记住、以后免输。这一步是让**后端同步接口**也认这个密码,防止别人调你的接口、蹭你的数据和 AI Key。
 
-> 这一步同时保护了网页和 `/api/sync` 接口 —— 登录后 Cloudflare 自动在请求里带上你的邮箱,后端据此隔离数据。别人没你的邮箱,既打不开网页,也调不了接口。
+1. 进入你的 Pages 项目 → **Settings → Environment variables**
+2. 点 **Add variable**(Production 环境):
+   - Variable name 填 **`APP_PASS`**
+   - Value 填 **`7564`**(和前端密码一致)
+   - 建议点 **Encrypt** 加密保存
+3. 保存后到 **Deployments** 页 **Retry deployment** 让变量生效
+
+> 密码怎么工作:前端源码里只存密码的哈希(看不到 `7564` 明文);每次同步请求会带上密码,后端比对 `APP_PASS` 一致才放行。别人没密码,既进不了 app,也调不动接口。
+
+**想改密码?** 改两个地方要一致:① 前端 `index.html` 里的 `PASS_HASH`(用新密码的 SHA-256),② 这里的 `APP_PASS`。需要时我帮你算哈希。
 
 ---
 
 ## 完成后
 
-- 手机/电脑浏览器打开 `https://moji-journal.pages.dev`,邮箱登录
+- 手机/电脑浏览器打开 `https://moji-journal.pages.dev`,输密码 `7564`(一次,以后免输)
 - iOS Safari:分享 → **添加到主屏幕**;Android Chrome:菜单 → **安装应用**
 - 现在电脑记的账,手机打开会自动同步过来(左下角同步图标:绿色=已同步,转圈=同步中,灰=离线,红=失败)
 
@@ -90,7 +89,7 @@ Cloudflare 会自动重新部署,几十秒后生效。
 
 ## 关于 AI Key 安全
 
-API Key 存在你浏览器本地(设置页填),不进代码仓库。配合 Access 密码,别人打不开网页也就用不了你的 Key。✅
+API Key 存在你浏览器本地(设置页填),不进代码仓库。配合密码(前端门 + 后端 APP_PASS),别人打不开 app、调不了接口,也就用不了你的 Key。✅
 
 ## 数据备份
 

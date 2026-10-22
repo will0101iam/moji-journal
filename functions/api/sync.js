@@ -3,14 +3,21 @@
 // 返回: { now: number, records: [{store,id,data,updatedAt,deleted}] }  // 服务端 updatedAt > since 的记录
 
 function userOf(request) {
-  // Cloudflare Access 登录后会注入此 header;没有 Access 时回退单用户
-  return request.headers.get('Cf-Access-Authenticated-User-Email') || 'local';
+  // Access 登录会注入此 header;没有 Access 时固定单用户(密码已做门禁)
+  return request.headers.get('Cf-Access-Authenticated-User-Email') || 'me';
+}
+
+// 密码校验:比对请求头 X-Moji-Pass 与环境变量 APP_PASS
+function checkPass(request, env) {
+  if (!env.APP_PASS) return true;                 // 未设置则不校验(本地开发)
+  return request.headers.get('X-Moji-Pass') === env.APP_PASS;
 }
 
 const STORES = new Set(['transactions', 'accounts', 'categories', 'budgets', 'goals']);
 
 export async function onRequestPost({ request, env }) {
   if (!env.DB) return json({ error: 'D1 未绑定(检查 Pages 设置里的 DB 绑定)' }, 500);
+  if (!checkPass(request, env)) return json({ error: '密码错误' }, 401);
   const user = userOf(request);
   let body;
   try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
@@ -44,6 +51,7 @@ export async function onRequestPost({ request, env }) {
 // 预检/诊断:GET 返回当前用户与记录数
 export async function onRequestGet({ request, env }) {
   if (!env.DB) return json({ error: 'D1 未绑定' }, 500);
+  if (!checkPass(request, env)) return json({ error: '密码错误' }, 401);
   const user = userOf(request);
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM records WHERE user = ?1 AND deleted = 0`

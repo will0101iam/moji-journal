@@ -260,6 +260,18 @@ canvas{max-width:100%}
 </style>
 </head>
 <body>
+<!-- 密码锁屏 -->
+<div id="lockScreen" style="position:fixed;inset:0;z-index:200;background:var(--bg);display:none;place-items:center;padding:24px">
+  <div style="width:100%;max-width:300px;text-align:center">
+    <div style="width:56px;height:56px;border-radius:16px;background:var(--brand);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:600;margin:0 auto 20px">墨</div>
+    <div style="font-size:20px;font-weight:600;margin-bottom:6px">墨记</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:24px">输入密码解锁</div>
+    <input id="lockInput" type="password" inputmode="numeric" autocomplete="off" placeholder="密码"
+      style="width:100%;padding:14px;text-align:center;font-size:20px;letter-spacing:6px;font-family:var(--mono);border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);outline:none">
+    <div id="lockErr" style="height:18px;font-size:12px;color:var(--danger);margin-top:8px"></div>
+    <button id="lockBtn" class="btn" style="width:100%;justify-content:center;margin-top:8px">解锁</button>
+  </div>
+</div>
 <div class="scrim" id="scrim" onclick="toggleMenu(false)"></div>
 <!-- 移动端顶栏 -->
 <header class="topbar">
@@ -441,9 +453,10 @@ async function syncNow(){
     const meta=syncMeta();
     const changes=await collectDirty();
     const res=await fetch('/api/sync',{
-      method:'POST',headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json','X-Moji-Pass':getPass()},
       body:JSON.stringify({since:meta.since,changes})
     });
+    if(res.status===401){lockOut();return;}   // 密码失效:重新锁屏
     if(!res.ok)throw new Error('HTTP '+res.status);
     const out=await res.json();
     await clearDirty(changes);
@@ -1100,14 +1113,15 @@ function viewSettings(){
     </div>
 
     <div class="card mt16">
-      <div class="card-title">数据管理(本地 · 不上传)</div>
+      <div class="card-title">数据管理</div>
       <div class="flex gap8 wrap">
         <button class="btn-ghost btn btn-sm" onclick="exportJSON()">导出 JSON 备份</button>
         <button class="btn-ghost btn btn-sm" onclick="exportCSV()">导出交易 CSV</button>
         <label class="btn-ghost btn btn-sm" style="cursor:pointer">导入 JSON<input type="file" accept=".json" style="display:none" onchange="importJSON(this)"></label>
+        <button class="btn-ghost btn btn-sm" onclick="lockOut()">锁定退出</button>
         <button class="btn btn-danger" onclick="resetAll()">清空所有数据</button>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:12px">所有数据存储在浏览器本地(IndexedDB),不经过任何服务器。换设备或清缓存前请先导出备份。</div>
+      <div class="muted" style="font-size:12px;margin-top:12px">数据存在本设备本地,并自动同步到你的云端。"锁定退出"会在本设备要求重新输入密码。换设备或清缓存前建议先导出备份。</div>
     </div>
   </div>`;
 }
@@ -1352,8 +1366,37 @@ function toggleMenu(force){
   sb.classList.toggle('open',open);sc.classList.toggle('open',open);
 }
 
+/* ===================== 密码门(A 体验 + B 安全) ===================== */
+// 正确密码的 SHA-256 哈希(源码不含明文密码)。改密码:重算此哈希 + 改后端 APP_PASS
+const PASS_HASH='6dc32ae01ea2417f37f28b4acb7079d3d20ab741b88a9862fa06be0ed64af44f';
+async function sha256(s){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function getPass(){return localStorage.getItem('mojiPass')||'';}       // 明文密码,仅存本设备,用作后端钥匙
+async function tryUnlock(pass){
+  const h=await sha256(pass);
+  if(h!==PASS_HASH)return false;
+  localStorage.setItem('mojiPass',pass);                                // 记住本设备,以后免输
+  return true;
+}
+function lockOut(){localStorage.removeItem('mojiPass');location.reload();}
+// 启动前的门禁:已记住→直接进;否则显示锁屏等待输入
+async function gate(){
+  const saved=getPass();
+  if(saved && await sha256(saved)===PASS_HASH){boot();return;}
+  const ls=$('#lockScreen'),inp=$('#lockInput'),err=$('#lockErr'),btn=$('#lockBtn');
+  ls.style.display='grid';setTimeout(()=>inp.focus(),100);
+  const submit=async()=>{
+    if(await tryUnlock(inp.value)){ls.style.display='none';boot();}
+    else{err.textContent='密码错误';inp.value='';inp.focus();}
+  };
+  btn.addEventListener('click',submit);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
+}
+
 /* ===================== 启动 ===================== */
-(async function init(){
+async function boot(){
   await openDB();
   await reload();
   let existing=(await dbAll('accounts')).filter(x=>!x.deleted);
@@ -1377,11 +1420,12 @@ function toggleMenu(force){
   window.addEventListener('online',syncNow);
   window.addEventListener('offline',()=>setSyncStatus('offline'));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
-})();
+}
+gate();  // 入口:先过密码门,再 boot
 // 首次拉取:只把云端数据写入本地,不触发渲染(此时 UI 尚未就绪)
 async function pullInitial(){
   const meta=syncMeta();
-  const res=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({since:meta.since,changes:[]})});
+  const res=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Moji-Pass':getPass()},body:JSON.stringify({since:meta.since,changes:[]})});
   if(!res.ok)throw new Error('HTTP '+res.status);
   const out=await res.json();
   await applyRemote(out.records||[]);
