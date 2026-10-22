@@ -476,10 +476,10 @@ let cfg=JSON.parse(localStorage.getItem('mojiCfg')||'null')||{
   apiKey:'',
   apiBase:'https://openrouter.ai/api/v1/chat/completions',
   model:'deepseek/deepseek-v4.1-flash-1017',
-  asrModel:'qwen/qwen3.8-omni-flash'
+  asrModel:'qwen/qwen3-asr-0.6b'
 };
 function saveCfg(){localStorage.setItem('mojiCfg',JSON.stringify(cfg));}
-if(!cfg.asrModel)cfg.asrModel='qwen/qwen3.8-omni-flash'; // 旧配置补默认 ASR 模型
+if(!cfg.asrModel||cfg.asrModel==='qwen/qwen3.8-omni-flash')cfg.asrModel='qwen/qwen3-asr-0.6b'; // 补/迁移默认 ASR 模型
 
 /* ===================== 内存缓存 ===================== */
 let DATA={tx:[],accounts:[],categories:[],budgets:[],goals:[]};
@@ -1086,12 +1086,12 @@ function viewSettings(){
         <div class="field"><label>视觉模型(截图记账)</label>
           <input class="input" id="s_model" value="${escapeHtml(cfg.model)}" placeholder="deepseek/deepseek-v4.1-flash-1017"></div>
         <div class="field"><label>语音模型(语音记账)</label>
-          <input class="input" id="s_asr" value="${escapeHtml(cfg.asrModel)}" placeholder="qwen/qwen3.8-omni-flash"></div>
+          <input class="input" id="s_asr" value="${escapeHtml(cfg.asrModel)}" placeholder="qwen/qwen3-asr-0.6b"></div>
       </div>
       <div class="field" style="margin-bottom:14px"><label>API 地址</label>
         <input class="input" id="s_base" value="${escapeHtml(cfg.apiBase)}"></div>
       <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:14px">
-        截图记账用<b>视觉模型</b>(默认 DeepSeek);语音记账用<b>支持音频输入的模型</b>,默认 <code>qwen/qwen3.8-omni-flash</code>——它能直接听录音并拆账。两者可独立替换成 OpenRouter 上其他支持对应输入的模型。
+        截图记账用<b>视觉模型</b>(默认 DeepSeek);语音记账用<b>ASR 转写模型</b>,默认 <code>qwen/qwen3-asr-0.6b</code>——录音先转文字,再由视觉/文本模型拆账并对歧义反问。两者可独立替换成 OpenRouter 上其他对应模型。
       </div>
       <button class="btn" onclick="saveAICfg()">保存 AI 配置</button>
     </div>
@@ -1130,7 +1130,7 @@ function viewSettings(){
     </div>
   </div>`;
 }
-function saveAICfg(){cfg.apiKey=$('#s_key').value.trim();cfg.model=$('#s_model').value.trim();cfg.asrModel=$('#s_asr').value.trim()||'qwen/qwen3.8-omni-flash';cfg.apiBase=$('#s_base').value.trim();saveCfg();toast('AI 配置已保存');}
+function saveAICfg(){cfg.apiKey=$('#s_key').value.trim();cfg.model=$('#s_model').value.trim();cfg.asrModel=$('#s_asr').value.trim()||'qwen/qwen3-asr-0.6b';cfg.apiBase=$('#s_base').value.trim();saveCfg();toast('AI 配置已保存');}
 // 一级分类(有图标/颜色/收支类型)
 function openTopCatModal(id){
   const c=id?catById(id):{name:'',kind:'exp',color:'#0B5E42',icon:'🏷️',parent:null};
@@ -1327,11 +1327,12 @@ function extractJSON(txt){
   return null;
 }
 let aiItems=[];
-function renderAIResult(items){
+function renderAIResult(items,recognizedText){
   aiItems=items;
   if(!items.length){$('#aiResult').innerHTML='<div class="card empty">没识别到有效条目,换张清晰的图/再说一遍试试</div>';return;}
   const needConfirm=items.filter(it=>it.question).length;
   $('#aiResult').innerHTML=`
+    ${recognizedText?`<div class="muted" style="font-size:12px;background:var(--surface-muted);border-radius:8px;padding:8px 10px;margin-bottom:10px">🎙️ 听到:${escapeHtml(recognizedText)}</div>`:''}
     <div class="muted" style="font-size:13px;margin-bottom:10px">识别到 ${items.length} 笔${needConfirm?`,其中 <b style="color:var(--warning)">${needConfirm} 笔需你确认</b>`:''},核对后入账:</div>
     ${items.map((it,i)=>`<div class="card" style="margin-bottom:10px;padding:14px;${it.question?'border-color:var(--warning)':''}">
       ${it.question?`<div style="display:flex;gap:8px;align-items:flex-start;background:var(--surface-muted);border-radius:8px;padding:8px 10px;margin-bottom:10px">
@@ -1421,17 +1422,31 @@ async function processRecording(){
   clearInterval(recTimer);updateRecUI(false);
   if(!audioChunks.length){toast('没录到声音');return;}
   const blob=new Blob(audioChunks,{type:audioMime||'audio/webm'});
-  const fmt=(audioMime.includes('mp4')||audioMime.includes('mpeg'))?'mp4':(audioMime.includes('ogg')?'ogg':'webm');
-  $('#aiResult').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span>AI 正在听并拆分账目…</span></div>`;
+  const ext=(audioMime.includes('mp4')||audioMime.includes('mpeg'))?'mp4':(audioMime.includes('ogg')?'ogg':'webm');
+  $('#aiResult').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span id="voiceStatus">AI 正在听…</span></div>`;
   try{
-    const b64=await blobToB64(blob);
-    const items=await callAudioParse(b64,fmt);
-    renderAIResult(items);
+    // 第一步:ASR 转文字
+    const text=await transcribe(blob,ext);
+    if(!text.trim())throw new Error('没听清,请再说一遍');
+    const st=$('#voiceStatus');if(st)st.textContent='识别到:'+text.slice(0,40)+'… 正在拆账';
+    // 第二步:文本拆账 + 反问
+    const items=await callTextParse(text);
+    renderAIResult(items,text);
   }catch(e){
     $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">识别失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">可改用下方"手动输入文字"。检查 API Key / ASR 模型 / 网络。</span></div>`;
   }
 }
-function blobToB64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});}
+// 调 OpenRouter 转写端点(qwen3-asr-0.6b 等纯 ASR 模型)
+async function transcribe(blob,ext){
+  const url=cfg.apiBase.replace(/\/chat\/completions.*$/,'/audio/transcriptions');
+  const fd=new FormData();
+  fd.append('model',cfg.asrModel);
+  fd.append('file',blob,'audio.'+ext);
+  const res=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+cfg.apiKey,'HTTP-Referer':location.origin,'X-Title':'MojiJournal'},body:fd});
+  if(!res.ok)throw new Error('转写 HTTP '+res.status+' '+(await res.text()).slice(0,100));
+  const j=await res.json();
+  return j.text||j.results?.[0]?.text||'';
+}
 async function parseVoiceText(){
   const text=$('#voiceText')?.value.trim();
   if(!text){toast('请输入文字');return;}
@@ -1450,16 +1465,7 @@ const ACCOUNT_PROMPT=()=>`今天是 ${todayISO()}。只返回 JSON,格式:
 - 典型需要确认:分不清是支出还是转账给别人、是否借出、金额听不清、分类模糊。
 - date 没提到就用今天;category 必须精确等于列表里的某一项。
 - 不要编造没提到的账目。不要解释,只输出 JSON。`;
-// 音频一步到位:听录音 + 拆账 + 反问
-async function callAudioParse(b64,format){
-  const prompt='你是记账助手。先听懂这段中文语音里的消费/收入(可能多笔),再拆成结构化账目。'+ACCOUNT_PROMPT();
-  const body={model:cfg.asrModel,messages:[{role:'user',content:[
-    {type:'text',text:prompt},
-    {type:'input_audio',input_audio:{data:b64,format}}
-  ]}],max_tokens:3000};
-  return parseAccountJSON(await callOR(body));
-}
-// 文本拆账(降级 / 手动输入)
+// 文本拆账(语音转写后 / 手动输入)
 async function callTextParse(text){
   const prompt='你是记账助手。用户用口语描述了一段消费/收入,可能包含多笔。请拆成结构化账目。'+ACCOUNT_PROMPT()+`\n用户说:「${text}」`;
   const body={model:cfg.model,messages:[{role:'user',content:prompt}],max_tokens:3000};
