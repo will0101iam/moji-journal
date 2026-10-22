@@ -475,9 +475,11 @@ let cfg=JSON.parse(localStorage.getItem('mojiCfg')||'null')||{
   theme:'light',
   apiKey:'',
   apiBase:'https://openrouter.ai/api/v1/chat/completions',
-  model:'deepseek/deepseek-v4.1-flash-1017'
+  model:'deepseek/deepseek-v4.1-flash-1017',
+  asrModel:'qwen/qwen3.8-omni-flash'
 };
 function saveCfg(){localStorage.setItem('mojiCfg',JSON.stringify(cfg));}
+if(!cfg.asrModel)cfg.asrModel='qwen/qwen3.8-omni-flash'; // 旧配置补默认 ASR 模型
 
 /* ===================== 内存缓存 ===================== */
 let DATA={tx:[],accounts:[],categories:[],budgets:[],goals:[]};
@@ -1077,17 +1079,19 @@ function viewSettings(){
     <div class="page-head"><div><div class="page-title">设置</div><div class="page-sub">AI、分类、数据管理</div></div></div>
 
     <div class="card">
-      <div class="card-title">AI 截图记账(OpenRouter)</div>
+      <div class="card-title">AI 配置(OpenRouter)</div>
       <div class="field" style="margin-bottom:14px"><label>API Key</label>
         <input class="input" id="s_key" type="password" placeholder="sk-or-..." value="${escapeHtml(cfg.apiKey)}"></div>
       <div class="grid grid-2" style="margin-bottom:14px">
-        <div class="field"><label>模型 ID(需支持视觉)</label>
+        <div class="field"><label>视觉模型(截图记账)</label>
           <input class="input" id="s_model" value="${escapeHtml(cfg.model)}" placeholder="deepseek/deepseek-v4.1-flash-1017"></div>
-        <div class="field"><label>API 地址</label>
-          <input class="input" id="s_base" value="${escapeHtml(cfg.apiBase)}"></div>
+        <div class="field"><label>语音模型(语音记账)</label>
+          <input class="input" id="s_asr" value="${escapeHtml(cfg.asrModel)}" placeholder="qwen/qwen3.8-omni-flash"></div>
       </div>
+      <div class="field" style="margin-bottom:14px"><label>API 地址</label>
+        <input class="input" id="s_base" value="${escapeHtml(cfg.apiBase)}"></div>
       <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:14px">
-        截图记账需要<b>支持视觉输入</b>的模型。当前已配置 <code>deepseek/deepseek-v4.1-flash-1017</code>。若该模型报不支持图片,换成其他视觉模型 slug(如 <code>google/gemini-flash-1.5</code>、<code>qwen/qwen2.5-vl-72b-instruct</code>)即可。
+        截图记账用<b>视觉模型</b>(默认 DeepSeek);语音记账用<b>支持音频输入的模型</b>,默认 <code>qwen/qwen3.8-omni-flash</code>——它能直接听录音并拆账。两者可独立替换成 OpenRouter 上其他支持对应输入的模型。
       </div>
       <button class="btn" onclick="saveAICfg()">保存 AI 配置</button>
     </div>
@@ -1126,7 +1130,7 @@ function viewSettings(){
     </div>
   </div>`;
 }
-function saveAICfg(){cfg.apiKey=$('#s_key').value.trim();cfg.model=$('#s_model').value.trim();cfg.apiBase=$('#s_base').value.trim();saveCfg();toast('AI 配置已保存');}
+function saveAICfg(){cfg.apiKey=$('#s_key').value.trim();cfg.model=$('#s_model').value.trim();cfg.asrModel=$('#s_asr').value.trim()||'qwen/qwen3.8-omni-flash';cfg.apiBase=$('#s_base').value.trim();saveCfg();toast('AI 配置已保存');}
 // 一级分类(有图标/颜色/收支类型)
 function openTopCatModal(id){
   const c=id?catById(id):{name:'',kind:'exp',color:'#0B5E42',icon:'🏷️',parent:null};
@@ -1365,7 +1369,7 @@ async function confirmAI(){
 }
 
 /* ===================== AI 语音记账 ===================== */
-let recog=null,recogText='';
+let mediaRec=null,audioChunks=[],audioMime='',recTimer=null,recSecs=0;
 function openVoice(){
   if(!cfg.apiKey){
     $('#aiModalBody').innerHTML=`<div class="empty" style="padding:20px">
@@ -1373,88 +1377,112 @@ function openVoice(){
       <button class="btn" onclick="closeModal('aiModal');go('settings')">去设置</button></div>`;
     openModal('aiModal');return;
   }
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const supported=!!SR;
+  const canRec=!!(navigator.mediaDevices&&window.MediaRecorder);
   $('#aiModalBody').innerHTML=`
-    <div class="ai-badge" style="margin-bottom:14px">语音记账 · ${escapeHtml(cfg.model)}</div>
+    <div class="ai-badge" style="margin-bottom:14px">语音记账 · ${escapeHtml(cfg.asrModel)}</div>
     <div style="text-align:center;padding:8px 0 4px">
-      <button id="micBtn" class="fab" style="position:static;margin:0 auto;width:72px;height:72px" onclick="toggleRecord()">
-        <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:30px;height:30px"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 19v3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <button id="micBtn" class="fab" style="position:static;margin:0 auto;width:76px;height:76px" onclick="toggleRecord()" ${canRec?'':'disabled'}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:32px;height:32px"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 19v3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <div id="micHint" class="muted" style="font-size:13px;margin-top:12px">${supported?'点麦克风开始说,例如:<br>"打车30,午饭45,给同事转了200"':'此浏览器不支持语音,请在下方直接输入文字'}</div>
+      <div id="micHint" class="muted" style="font-size:13px;margin-top:12px">${canRec?'点一下开始说,比如:<br>"打车30,午饭45,给同事转了200"<br>说完再点一下结束':'此设备不支持录音,请在下方直接输入文字'}</div>
     </div>
-    <div class="field" style="margin-top:14px">
-      <label>${supported?'识别文字(可编辑修正)':'输入消费内容'}</label>
-      <textarea class="input" id="voiceText" style="min-height:70px" placeholder="例如:今天打车花了30,中午吃饭45,给同事转了200"></textarea>
-    </div>
-    <button class="btn" style="width:100%;margin-top:4px" onclick="parseVoiceText()">AI 拆账</button>
+    <details style="margin-top:14px"${canRec?'':' open'}>
+      <summary class="muted" style="font-size:13px;cursor:pointer">或手动输入文字</summary>
+      <div class="field" style="margin-top:8px">
+        <textarea class="input" id="voiceText" style="min-height:64px" placeholder="例如:今天打车花了30,中午吃饭45,给同事转了200"></textarea>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="parseVoiceText()">文字拆账</button>
+      </div>
+    </details>
     <div id="aiResult" style="margin-top:16px"></div>`;
   openModal('aiModal');
-  recogText='';
 }
-function toggleRecord(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('浏览器不支持语音');return;}
-  if(recog){stopRecord();return;}
-  recog=new SR();
-  recog.lang='zh-CN';recog.continuous=true;recog.interimResults=true;
-  recogText=$('#voiceText').value||'';
-  const base=recogText;
-  recog.onresult=e=>{
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const t=e.results[i][0].transcript;
-      if(e.results[i].isFinal)recogText+=t;else interim+=t;
-    }
-    $('#voiceText').value=recogText+interim;
-  };
-  recog.onerror=e=>{toast('语音出错:'+e.error);stopRecord();};
-  recog.onend=()=>{if(recog){recog=null;updateMicUI(false);}};
-  recog.start();updateMicUI(true);
+async function toggleRecord(){
+  if(mediaRec&&mediaRec.state==='recording'){stopRecord();return;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    // 选浏览器支持的音频格式(Safari 多为 mp4/aac,Chrome 多为 webm/opus)
+    audioMime=['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+    mediaRec=new MediaRecorder(stream,audioMime?{mimeType:audioMime}:undefined);
+    audioChunks=[];
+    mediaRec.ondataavailable=e=>{if(e.data.size)audioChunks.push(e.data);};
+    mediaRec.onstop=()=>{stream.getTracks().forEach(t=>t.stop());processRecording();};
+    mediaRec.start();
+    recSecs=0;updateRecUI(true);
+    recTimer=setInterval(()=>{recSecs++;const h=$('#micHint');if(h)h.textContent='录音中 '+recSecs+'s…点一下结束';},1000);
+  }catch(e){toast('麦克风打不开:'+(e.message||e.name));}
 }
-function stopRecord(){if(recog){const r=recog;recog=null;try{r.stop();}catch(e){}}updateMicUI(false);}
-function updateMicUI(on){
+function stopRecord(){if(mediaRec&&mediaRec.state==='recording')mediaRec.stop();clearInterval(recTimer);updateRecUI(false);}
+function updateRecUI(on){
   const btn=$('#micBtn'),hint=$('#micHint');
   if(btn)btn.style.background=on?'var(--danger)':'var(--brand)';
-  if(hint)hint.textContent=on?'正在聆听…再次点击停止':'点麦克风开始说';
+  if(hint&&!on)hint.textContent='点一下开始说,说完再点一下结束';
 }
+async function processRecording(){
+  clearInterval(recTimer);updateRecUI(false);
+  if(!audioChunks.length){toast('没录到声音');return;}
+  const blob=new Blob(audioChunks,{type:audioMime||'audio/webm'});
+  const fmt=(audioMime.includes('mp4')||audioMime.includes('mpeg'))?'mp4':(audioMime.includes('ogg')?'ogg':'webm');
+  $('#aiResult').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span>AI 正在听并拆分账目…</span></div>`;
+  try{
+    const b64=await blobToB64(blob);
+    const items=await callAudioParse(b64,fmt);
+    renderAIResult(items);
+  }catch(e){
+    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">识别失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">可改用下方"手动输入文字"。检查 API Key / ASR 模型 / 网络。</span></div>`;
+  }
+}
+function blobToB64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);});}
 async function parseVoiceText(){
-  stopRecord();
-  const text=$('#voiceText').value.trim();
-  if(!text){toast('请先说话或输入文字');return;}
+  const text=$('#voiceText')?.value.trim();
+  if(!text){toast('请输入文字');return;}
   $('#aiResult').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span>AI 正在拆分账目…</span></div>`;
   try{
     const items=await callTextParse(text);
     renderAIResult(items);
   }catch(e){
-    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">拆账失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">检查 API Key / 模型 / 网络。</span></div>`;
+    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">拆账失败:${escapeHtml(e.message)}</div>`;
   }
 }
-// 把一段自然语言拆成多笔账,低置信度给出 question 反问
-async function callTextParse(text){
-  const catList=leafCats().map(c=>c.name).join('、');
-  const prompt=`你是记账助手。用户用口语描述了一段消费/收入,可能包含多笔。请拆成结构化账目。
-今天是 ${todayISO()}。只返回 JSON,格式:
-{"items":[{"amount":数字,"merchant":"简短说明","date":"YYYY-MM-DD","kind":"exp或inc","category":"从[${catList}]里选最合适的","confidence":0到1,"question":"仅当你不确定时填一句要向用户确认的问题,否则留空字符串"}]}
+const ACCOUNT_PROMPT=()=>`今天是 ${todayISO()}。只返回 JSON,格式:
+{"items":[{"amount":数字,"merchant":"简短说明","date":"YYYY-MM-DD","kind":"exp或inc","category":"从[${leafCats().map(c=>c.name).join('、')}]里选最合适的","confidence":0到1,"question":"仅当你不确定时填一句要向用户确认的问题,否则留空字符串"}]}
 规则:
 - amount 取正数;金额/分类/收支拿不准时,confidence 给低分(<0.6)并在 question 里用一句话问用户。
-- 典型需要确认的情况:分不清是支出还是转账给别人、是否借出、金额听不清、分类模糊。
+- 典型需要确认:分不清是支出还是转账给别人、是否借出、金额听不清、分类模糊。
 - date 没提到就用今天;category 必须精确等于列表里的某一项。
-- 不要编造没提到的账目。不要解释,只输出 JSON。
-用户说:「${text}」`;
+- 不要编造没提到的账目。不要解释,只输出 JSON。`;
+// 音频一步到位:听录音 + 拆账 + 反问
+async function callAudioParse(b64,format){
+  const prompt='你是记账助手。先听懂这段中文语音里的消费/收入(可能多笔),再拆成结构化账目。'+ACCOUNT_PROMPT();
+  const body={model:cfg.asrModel,messages:[{role:'user',content:[
+    {type:'text',text:prompt},
+    {type:'input_audio',input_audio:{data:b64,format}}
+  ]}],max_tokens:3000};
+  return parseAccountJSON(await callOR(body));
+}
+// 文本拆账(降级 / 手动输入)
+async function callTextParse(text){
+  const prompt='你是记账助手。用户用口语描述了一段消费/收入,可能包含多笔。请拆成结构化账目。'+ACCOUNT_PROMPT()+`\n用户说:「${text}」`;
   const body={model:cfg.model,messages:[{role:'user',content:prompt}],max_tokens:3000};
+  return parseAccountJSON(await callOR(body));
+}
+// 统一 OpenRouter 调用,返回合并后的文本
+async function callOR(body){
   const res=await fetch(cfg.apiBase,{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey,'HTTP-Referer':location.origin,'X-Title':'MojiJournal'},
     body:JSON.stringify(body)
   });
-  if(!res.ok){throw new Error('HTTP '+res.status+' '+(await res.text()).slice(0,120));}
+  if(!res.ok)throw new Error('HTTP '+res.status+' '+(await res.text()).slice(0,120));
   const j=await res.json();
   const msg=j.choices?.[0]?.message||{};
-  let txt=(msg.content||'')+'\n'+(msg.reasoning||'');
+  const txt=(msg.content||'')+'\n'+(msg.reasoning||'');
   if(!txt.trim())throw new Error('模型无返回');
+  return txt;
+}
+// 把模型返回解析成账目数组(含分类映射与疑问兜底)
+function parseAccountJSON(txt){
   const parsed=extractJSON(txt);
-  if(!parsed)throw new Error('未能解析出账目,换种说法再试');
+  if(!parsed)throw new Error('未能解析出账目,再说一遍或换种说法');
   const rawItems=Array.isArray(parsed.items)?parsed.items:(parsed.amount!=null?[parsed]:[]);
   return rawItems.map(it=>{
     const kind=it.kind==='inc'?'inc':'exp';
