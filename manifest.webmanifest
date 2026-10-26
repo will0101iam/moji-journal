@@ -1,0 +1,20 @@
+{
+  "name": "墨记 · 极简记账",
+  "short_name": "墨记",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBFBFA",
+  "theme_color": "#0B5E42",
+  "description": "本地优先、端到端加密的极简个人记账应用",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

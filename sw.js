@@ -1,55 +1,86 @@
-/* 墨记 Service Worker — 应用外壳 network-first(永远拿最新),静态资源 cache-first */
-const CACHE = 'moji-v3';
-const PRECACHE = ['./', './index.html', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'];
+/* 墨记 Service Worker — 已安装外壳立即启动,后台更新下一次启动版本 */
+const CACHE = 'moji-v4-20261026';
+const SHELL_URL = new URL('./index.html', self.registration.scope).href;
+const STATIC_URLS = [
+  new URL('./manifest.webmanifest', self.registration.scope).href,
+  new URL('./icon.svg', self.registration.scope).href,
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
+];
 
-self.addEventListener('install', e => {
+async function cleanNavigationResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.delete('content-encoding');
+  headers.delete('content-length');
+  headers.delete('transfer-encoding');
+  return new Response(await response.blob(), {
+    status: 200,
+    statusText: 'OK',
+    headers
+  });
+}
+
+async function refreshShell(request) {
+  const response = await fetch(request, {cache: 'no-store', redirect: 'follow'});
+  if (!response || !response.ok) throw new Error('shell fetch failed');
+  const clean = await cleanNavigationResponse(response);
+  const cache = await caches.open(CACHE);
+  await cache.put(SHELL_URL, clean.clone());
+  return clean;
+}
+
+self.addEventListener('install', event => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE).catch(() => {})));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await refreshShell(new Request(SHELL_URL, {cache: 'reload'}));
+    await Promise.allSettled(STATIC_URLS.map(url => cache.add(url)));
+  })());
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
-function isAppShell(req, u) {
-  // HTML 文档 / 根路径 / index.html —— 应用外壳,必须拿最新
-  return req.mode === 'navigate' || u.pathname === '/' || u.pathname.endsWith('/index.html');
+function isAppShell(request, url) {
+  return request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('/index.html');
 }
 
-self.addEventListener('fetch', e => {
-  const u = new URL(e.request.url);
-  if (e.request.method !== 'GET') return;          // 不缓存 API POST
-  if (u.hostname === 'openrouter.ai') return;      // AI 请求始终直连
-  if (u.pathname.startsWith('/api/')) return;      // 后端接口直连,不缓存
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET') return;
+  if (url.hostname === 'openrouter.ai' || url.pathname.startsWith('/api/')) return;
 
-  // 应用外壳:network-first,拿到新版就更新缓存;离线才回退缓存
-  if (isAppShell(e.request, u)) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res && res.status === 200) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put('./index.html', copy));
-        }
-        return res;
-      }).catch(() => caches.match('./index.html') || caches.match('./'))
-    );
+  if (isAppShell(event.request, url)) {
+    const cached = caches.open(CACHE).then(cache => cache.match(SHELL_URL));
+    const refreshed = refreshShell(event.request);
+    event.waitUntil(refreshed.catch(() => {}));
+    event.respondWith((async () => {
+      const shell = await cached;
+      if (shell) return cleanNavigationResponse(shell);
+      try {
+        return await refreshed;
+      } catch (error) {
+        const fallback = await caches.match(SHELL_URL);
+        if (fallback) return cleanNavigationResponse(fallback);
+        throw error;
+      }
+    })());
     return;
   }
 
-  // 静态资源(Chart.js 等):cache-first,后台更新
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const net = fetch(e.request).then(res => {
-        if (res && res.status === 200 && (u.origin === location.origin || u.hostname === 'cdn.jsdelivr.net')) {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || net;
-    })
-  );
+  const cached = caches.match(event.request);
+  const network = fetch(event.request).then(async response => {
+    if (response && response.status === 200 &&
+        (url.origin === self.location.origin || url.hostname === 'cdn.jsdelivr.net')) {
+      const cache = await caches.open(CACHE);
+      await cache.put(event.request, response.clone());
+    }
+    return response;
+  });
+  event.waitUntil(network.catch(() => {}));
+  event.respondWith(cached.then(response => response || network));
 });

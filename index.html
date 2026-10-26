@@ -10,6 +10,22 @@
 <meta name="apple-mobile-web-app-title" content="墨记">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' rx='40' fill='%230B5E42'/%3E%3Ctext x='90' y='124' font-size='96' font-family='PingFang SC,sans-serif' fill='white' text-anchor='middle'%3E墨%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="./manifest.webmanifest">
+<script>
+(() => {
+  const root=document.documentElement;
+  try{
+    const config=JSON.parse(localStorage.getItem('mojiCfg')||'null');
+    if(config?.theme==='dark')root.setAttribute('data-theme','dark');
+    root.dataset.startupLaunch=config?.launchCapture===false?'0':'1';
+    const remembered=JSON.parse(localStorage.getItem('mojiKey')||'null');
+    if(!remembered||Date.now()>Number(remembered.exp))root.dataset.startupLocked='1';
+  }catch(e){
+    root.dataset.startupLaunch='1';
+    root.dataset.startupLocked='1';
+  }
+})();
+</script>
 <title>墨记 · 极简记账</title>
 <style>
 /* ============ 设计 Token:墨绿极简高级感 ============ */
@@ -120,6 +136,7 @@ a{color:inherit;text-decoration:none}
 }
 .btn:hover{background:var(--brand-strong)}
 .btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.55;cursor:default;transform:none}
 .btn svg{width:16px;height:16px;stroke-width:2}
 .btn-ghost{background:var(--surface-muted);color:var(--text);box-shadow:none}
 .btn-ghost:hover{background:var(--border-strong)}
@@ -210,8 +227,13 @@ textarea.input{resize:vertical;min-height:60px}
 .empty svg{width:40px;height:40px;margin:0 auto var(--sp-12);opacity:.5}
 
 /* toast */
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:var(--radius-full);font-size:13px;font-weight:500;box-shadow:var(--shadow-md);opacity:0;transition:.25s;z-index:100;pointer-events:none}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);display:flex;align-items:center;gap:14px;max-width:calc(100vw - 32px);background:var(--text);color:var(--bg);padding:10px 12px 10px 18px;border-radius:var(--radius-full);font-size:13px;font-weight:500;box-shadow:var(--shadow-md);opacity:0;transition:.25s;z-index:260;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+#toast.top{top:calc(68px + env(safe-area-inset-top));bottom:auto;transform:translateX(-50%) translateY(-20px)}
+#toast.top.show{transform:translateX(-50%) translateY(0)}
+#toastMessage{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toastAction{flex-shrink:0;padding:5px 10px;border-radius:var(--radius-full);background:var(--brand);color:#fff;font-size:13px;font-weight:600}
+#toastAction[hidden]{display:none}
 
 /* FAB */
 .fab{position:fixed;right:calc(20px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;box-shadow:var(--shadow-md);z-index:40;transition:transform .12s,background .15s}
@@ -229,7 +251,7 @@ textarea.input{resize:vertical;min-height:60px}
 /* 开屏记账全屏页 */
 .launch{position:fixed;inset:0;z-index:150;background:var(--bg);display:none;flex-direction:column;
   padding:calc(env(safe-area-inset-top) + 8px) 20px calc(env(safe-area-inset-bottom) + 18px)}
-.launch.open{display:flex}
+.launch.open,html[data-startup-launch="1"]:not([data-startup-locked="1"]):not([data-booted="1"]) .launch{display:flex}
 .launch-head{display:flex;align-items:center;justify-content:space-between;height:48px;flex-shrink:0}
 .launch-brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px}
 .launch-mark{width:28px;height:28px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
@@ -325,6 +347,7 @@ textarea.input{resize:vertical;min-height:60px}
   .budget-category-row{padding:8px 0}
 }
 canvas{max-width:100%}
+html[data-startup-locked="1"] #lockScreen{display:grid!important}
 .seg{display:inline-flex;background:var(--surface-muted);border-radius:var(--radius);padding:3px;gap:2px}
 .seg button{padding:5px 12px;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
 .seg button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
@@ -427,7 +450,7 @@ canvas{max-width:100%}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 19v3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <textarea class="launch-entry" id="launchText" rows="1" enterkeyhint="send" placeholder="迪卡侬鞋垫 59.9" aria-label="自然语言记账"></textarea>
-      <button type="submit" class="launch-send" aria-label="记账">
+      <button type="submit" class="launch-send" id="launchSendButton" aria-label="记账">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 19V5M5 12l7-7 7 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </form>
@@ -468,9 +491,12 @@ canvas{max-width:100%}
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite">
+  <span id="toastMessage"></span>
+  <button id="toastAction" type="button" hidden></button>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" onload="window.dispatchEvent(new Event('moji:chart-ready'))"></script>
 <script>
 /* ===================== 工具 ===================== */
 const $=(s,r=document)=>r.querySelector(s);
@@ -483,7 +509,24 @@ function todayISO(d=new Date()){
 const CUR=()=>cfg.currency||'¥';
 function fmt(n){return CUR()+Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtNo(n){return Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
+function toast(msg,{duration=2200,actionLabel='',onAction=null,position='bottom'}={}){
+  const t=$('#toast'),message=$('#toastMessage'),action=$('#toastAction');
+  const seq=(t._seq||0)+1;t._seq=seq;
+  t.classList.toggle('top',position==='top');
+  message.textContent=msg;action.hidden=!actionLabel;action.textContent=actionLabel;action.disabled=false;
+  action.onclick=onAction?async()=>{
+    if(t._seq!==seq)return;
+    action.disabled=true;
+    try{
+      await onAction();
+      if(t._seq===seq)t.classList.remove('show');
+    }catch(e){
+      toast('操作失败,请重试');
+    }
+  }:null;
+  t.classList.add('show');clearTimeout(t._t);
+  t._t=setTimeout(()=>{if(t._seq===seq)t.classList.remove('show');},duration);
+}
 function monthKey(d){return d.slice(0,7);}
 function curMonth(){return todayISO().slice(0,7);}
 function escapeHtml(s){return(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -769,6 +812,9 @@ function detectSubs(){
 /* ===================== 视图:仪表盘 ===================== */
 let charts={};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};}
+window.addEventListener('moji:chart-ready',()=>{
+  if(curRoute==='budget'&&$('#dailyBar')&&!charts.dailyBar)viewBudget();
+});
 function viewDashboard(){
   destroyCharts();
   const mt=monthTx();
@@ -1079,6 +1125,7 @@ function viewBudget(){
 }
 // 预算页图表:每日支出柱 + 分类饼 + 预算节奏
 function renderBudgetCharts(ym,catArr,totalLimit,dayToday){
+  if(!window.Chart)return;
   const css=getComputedStyle(document.body);
   const cText=css.getPropertyValue('--text-muted').trim(),cBorder=css.getPropertyValue('--border').trim();
   const cBrand=css.getPropertyValue('--brand').trim(),cDanger=css.getPropertyValue('--danger').trim();
@@ -1448,9 +1495,106 @@ async function doReset(){
   await seedAll();closeModal('genModal');toast('已重置');go('dashboard');queueSync();
 }
 
+/* ===================== AI 批次写入与撤销 ===================== */
+const AI_UNDO_WINDOW_MS=5200;
+const aiBatchSaves=new Map();
+function newAIBatchId(){return crypto.randomUUID?crypto.randomUUID():uid();}
+function aiSourceId(batchId,index){return `ai:${batchId}:${index}`;}
+function saveAIBatch(items,{batchId,account=defaultAccount()}={}){
+  if(!batchId||!account)return Promise.reject(new Error('AI 批次或账户无效'));
+  if(aiBatchSaves.has(batchId))return aiBatchSaves.get(batchId);
+  const pending=new Promise((resolve,reject)=>{
+    let result={batchId,saved:[],skipped:0},failure=null;
+    const idbTx=db.transaction(['transactions','accounts'],'readwrite');
+    const txs=idbTx.objectStore('transactions'),accounts=idbTx.objectStore('accounts');
+    idbTx.oncomplete=()=>{
+      if(result.saved.length)queueSync();
+      resolve(result);
+    };
+    idbTx.onabort=()=>reject(failure||idbTx.error||new Error('AI 批次写入失败'));
+    const allReq=txs.getAll();
+    allReq.onsuccess=()=>{
+      const existing=new Set((allReq.result||[]).map(t=>t.sourceId).filter(Boolean));
+      const now=Date.now();
+      const records=items.map((it,index)=>({
+        id:uid(),sourceId:aiSourceId(batchId,index),batchId,
+        kind:it.kind,amount:normalizeAIAmount(it.amount),category:it.category,account,
+        date:it.date,note:String(it.merchant||'').trim(),tags:['AI'],createdAt:now+index,
+        updatedAt:now,_dirty:1
+      })).filter(rec=>{
+        if(existing.has(rec.sourceId)){result.skipped++;return false;}
+        existing.add(rec.sourceId);return true;
+      });
+      result.saved=records;
+      if(!records.length)return;
+      const accountReq=accounts.get(account);
+      accountReq.onsuccess=()=>{
+        const current=accountReq.result;
+        if(!current||current.deleted){
+          failure=new Error('没有可用账户,请先创建账户');
+          idbTx.abort();return;
+        }
+        const delta=records.reduce((sum,rec)=>sum+(rec.kind==='exp'?-rec.amount:rec.amount),0);
+        current.balance=(Number(current.balance)||0)+delta;
+        current.updatedAt=now;current._dirty=1;
+        accounts.put(current);
+        records.forEach(rec=>txs.put(rec));
+      };
+    };
+  });
+  const tracked=pending.finally(()=>aiBatchSaves.delete(batchId));
+  aiBatchSaves.set(batchId,tracked);
+  return tracked;
+}
+function undoAIBatch(batchId){
+  return new Promise((resolve,reject)=>{
+    let count=0;
+    const idbTx=db.transaction(['transactions','accounts'],'readwrite');
+    const txs=idbTx.objectStore('transactions'),accounts=idbTx.objectStore('accounts');
+    idbTx.oncomplete=()=>{if(count)queueSync();resolve(count);};
+    idbTx.onabort=()=>reject(idbTx.error||new Error('撤销失败'));
+    const allReq=txs.getAll();
+    allReq.onsuccess=()=>{
+      const prefix=`ai:${batchId}:`,now=Date.now(),reversals=new Map();
+      const records=(allReq.result||[]).filter(t=>!t.deleted&&(t.batchId===batchId||String(t.sourceId||'').startsWith(prefix)));
+      count=records.length;
+      records.forEach(rec=>{
+        rec.deleted=1;rec.updatedAt=now;rec._dirty=1;txs.put(rec);
+        const delta=rec.kind==='exp'?rec.amount:-rec.amount;
+        reversals.set(rec.account,(reversals.get(rec.account)||0)+delta);
+      });
+      reversals.forEach((delta,accountId)=>{
+        const req=accounts.get(accountId);
+        req.onsuccess=()=>{
+          const account=req.result;
+          if(!account)return;
+          account.balance=(Number(account.balance)||0)+delta;
+          account.updatedAt=now;account._dirty=1;accounts.put(account);
+        };
+      });
+    };
+  });
+}
+function showAIBatchUndo(batchId,count){
+  if(!count)return;
+  toast(`已入账 ${count} 笔`,{
+    duration:AI_UNDO_WINDOW_MS,
+    actionLabel:'撤销',
+    position:$('#launchCapture').classList.contains('open')?'top':'bottom',
+    onAction:async()=>{
+      const undone=await undoAIBatch(batchId);
+      await reload();render();
+      if($('#launchCapture').classList.contains('open')){
+        launchFeedback(`<div class="card" style="padding:14px">已撤销 ${undone} 笔</div>`);
+      }
+      toast(undone?`已撤销 ${undone} 笔`:'这批记录已撤销');
+    }
+  });
+}
+
 /* ===================== AI 截图记账 ===================== */
 function openAI(){
-  aiReturnToLaunch=false;aiLaunchDraft='';
+  aiReturnToLaunch=false;aiLaunchDraft='';aiItems=[];aiBatchId='';aiEditorRecognizedText='';
   $('#aiModalBody').innerHTML=`
     <div class="ai-badge" style="margin-bottom:14px">视觉识别 · ${escapeHtml(cfg.model)}</div>
     <div class="drop" id="drop" onclick="$('#aiFile').click()">
@@ -1515,7 +1659,7 @@ function extractJSON(txt){
   if(s>=0&&e>s){try{return JSON.parse(txt.slice(s,e+1));}catch(e){}}
   return null;
 }
-let aiItems=[],aiEditorRecognizedText='',aiReturnToLaunch=false,aiLaunchDraft='';
+let aiItems=[],aiBatchId='',aiConfirming=false,aiEditorRecognizedText='',aiReturnToLaunch=false,aiLaunchDraft='';
 function aiCategoryOptions(kind,selected=''){
   return `<option value="">请选择分类</option>`+(kind?topCats(kind).map(top=>`<optgroup label="${top.icon} ${escapeHtml(top.name)}">${subCats(top.id).map(s=>`<option value="${s.id}" ${s.id===selected?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}</optgroup>`).join(''):'');
 }
@@ -1530,6 +1674,7 @@ function aiItemIssues(it){
   return [...new Set(issues)];
 }
 function renderAIResult(items,recognizedText=''){
+  if(items!==aiItems)aiBatchId=newAIBatchId();
   aiItems=items;
   aiEditorRecognizedText=recognizedText;
   if(!items.length){$('#aiResult').innerHTML='<div class="card empty">没识别到有效条目,换张清晰的图/再说一遍试试</div>';return;}
@@ -1553,7 +1698,7 @@ function renderAIResult(items,recognizedText=''){
       </div>
       <div class="field" style="margin-top:10px"><label>说明</label><input class="input" value="${escapeHtml(it.merchant)}" onchange="aiItems[${i}].merchant=this.value"></div>
     </div>`}).join('')}
-    <div class="sheet-foot"><button class="btn" style="width:100%" onclick="confirmAI()">全部入账(${items.length}笔)</button></div>`;
+    <div class="sheet-foot"><button class="btn" id="confirmAIButton" style="width:100%" onclick="confirmAI()" ${aiConfirming?'disabled':''}>${aiConfirming?'入账中…':`全部入账(${items.length}笔)`}</button></div>`;
 }
 function aiSetAmount(i,value){
   aiItems[i].amount=normalizeAIAmount(value);
@@ -1579,6 +1724,7 @@ function aiSetKind(i,kind){
   renderAIResult(aiItems,aiEditorRecognizedText);
 }
 async function confirmAI(){
+  if(aiConfirming)return;
   const acc=defaultAccount();
   if(!acc){toast('没有可用账户,请先创建账户');return;}
   const invalidIndex=aiItems.findIndex(it=>aiItemIssues(it).length);
@@ -1587,25 +1733,94 @@ async function confirmAI(){
     renderAIResult(aiItems,aiEditorRecognizedText);
     return;
   }
-  const savedCount=aiItems.length;
-  for(const it of aiItems){
-    const rec={id:uid(),kind:it.kind,amount:normalizeAIAmount(it.amount),category:it.category,account:acc,date:it.date,note:it.merchant,tags:['AI'],createdAt:Date.now()};
-    await applyBalance(rec,null);
-    await dbPut('transactions',rec);
+  aiConfirming=true;
+  const button=$('#confirmAIButton');
+  if(button){button.disabled=true;button.textContent='入账中…';}
+  const batchId=aiBatchId||newAIBatchId();
+  try{
+    const result=await saveAIBatch(aiItems,{batchId,account:acc});
+    await reload();
+    if(aiReturnToLaunch){
+      aiLaunchDraft='';
+      await clearLaunchDraft();
+    }
+    closeModal('aiModal');
+    aiItems=[];aiBatchId='';aiEditorRecognizedText='';
+    render();
+    if(result.saved.length)showAIBatchUndo(batchId,result.saved.length);
+    else toast('这批账目已入账');
+  }catch(e){
+    toast('入账失败:'+(e.message||'请重试'));
+  }finally{
+    aiConfirming=false;
+    const current=$('#confirmAIButton');
+    if(current){current.disabled=false;current.textContent=`全部入账(${aiItems.length}笔)`;}
   }
-  await reload();
-  if(aiReturnToLaunch)aiLaunchDraft='';
-  aiItems=[];aiEditorRecognizedText='';
-  closeModal('aiModal');
-  toast(`已入账 ${savedCount} 笔`);render();
 }
 
 /* ===================== 开屏记账(全屏,连续快速记账) ===================== */
+const LAUNCH_DRAFT_KEY='mojiLaunchDraftV1',LAUNCH_DRAFT_TTL=7*864e5;
+let launchDraftWriteSeq=0,launchDraftReady=false,launchSending=false;
+function setLaunchText(value,{persist=true}={}){
+  const input=$('#launchText');
+  if(input)input.value=value;
+  if(persist)persistLaunchDraft(value);
+}
+function initLaunchDraftCapture(){
+  const input=$('#launchText');
+  if(!input||input.dataset.draftCapture==='1')return;
+  input.dataset.draftCapture='1';
+  input.addEventListener('input',()=>persistLaunchDraft(input.value,{userInitiated:true}));
+  window.addEventListener('pagehide',()=>persistLaunchDraft(input.value));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)persistLaunchDraft(input.value);});
+}
+async function persistLaunchDraft(value,{userInitiated=false}={}){
+  if(!value&&!launchDraftReady&&!userInitiated)return;
+  const seq=++launchDraftWriteSeq;
+  if(!value){
+    localStorage.removeItem(LAUNCH_DRAFT_KEY);
+    return;
+  }
+  if(!cryptoKey)return;
+  try{
+    const now=Date.now(),cipher=await encField(value);
+    if(seq!==launchDraftWriteSeq||$('#launchText')?.value!==value)return;
+    localStorage.setItem(LAUNCH_DRAFT_KEY,JSON.stringify({version:1,cipher,updatedAt:now,expiresAt:now+LAUNCH_DRAFT_TTL}));
+  }catch(e){}
+}
+async function restoreLaunchDraft(){
+  const input=$('#launchText');
+  if(!input||!cryptoKey)return;
+  const earlyValue=input.value;
+  let restored='';
+  try{
+    const stored=JSON.parse(localStorage.getItem(LAUNCH_DRAFT_KEY)||'null');
+    if(stored){
+      if(!stored.cipher||Date.now()>Number(stored.expiresAt)){
+        localStorage.removeItem(LAUNCH_DRAFT_KEY);
+      }else{
+        restored=await decField(stored.cipher);
+      }
+    }
+  }catch(e){
+    localStorage.removeItem(LAUNCH_DRAFT_KEY);
+  }
+  const value=earlyValue||restored;
+  input.value=value;
+  launchDraftReady=true;
+  if(earlyValue)await persistLaunchDraft(earlyValue);
+}
+function clearLaunchDraft(){
+  launchDraftWriteSeq++;
+  launchDraftReady=true;
+  localStorage.removeItem(LAUNCH_DRAFT_KEY);
+  const input=$('#launchText');if(input)input.value='';
+}
 function openLaunch(){
   cancelLaunchRecording();                // 打开时取消残留录音,确保默认静音
   $('#launchCapture').classList.add('open');
   $('#launchFeedback').innerHTML='';
-  const t=$('#launchText');if(t){t.value='';setTimeout(()=>t.focus(),120);}
+  const t=$('#launchText');if(t)setTimeout(()=>t.focus(),120);
 }
 function closeLaunch(){
   cancelLaunchRecording();                 // 退出时取消录音,不再处理被取消的音频
@@ -1644,8 +1859,12 @@ function resetLaunchMic(){
 // 发送自然语言 → 拆账 → 高置信直接入账,留在开屏页继续记
 async function launchSend(e){
   if(e)e.preventDefault();
-  const text=$('#launchText').value.trim();
+  if(launchSending)return;
+  const input=$('#launchText'),text=input.value.trim();
   if(!text){return;}
+  persistLaunchDraft(input.value);
+  launchSending=true;
+  const sendButton=$('#launchSendButton');if(sendButton)sendButton.disabled=true;
   launchFeedback('<div class="card" style="display:flex;align-items:center;gap:12px"><div class="spinner"></div><span>AI 正在记账…</span></div>');
   try{
     const items=await callTextParse(text);
@@ -1654,13 +1873,16 @@ async function launchSend(e){
     if(!needConfirm){
       const acc=defaultAccount();
       if(!acc)throw new Error('没有可用账户,请先创建账户');
-      for(const it of items){
-        const rec={id:uid(),kind:it.kind,amount:it.amount,category:it.category,account:acc,date:it.date,note:it.merchant,tags:['AI'],createdAt:Date.now()};
-        await applyBalance(rec,null);await dbPut('transactions',rec);
-      }
+      const batchId=newAIBatchId();
+      const result=await saveAIBatch(items,{batchId,account:acc});
       await reload();
-      $('#launchText').value='';
-      launchFeedback(items.map(it=>`<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center"><span class="chip-cat"><span class="dot" style="background:${catColor(it.category)}"></span>${escapeHtml(it.merchant||catName(it.category))}</span><b class="num" style="color:var(--up)">${fmt(it.amount)}</b></div>`).join('')+`<div class="muted" style="font-size:12px;text-align:center;margin-top:4px">✓ 已记 ${items.length} 笔 · 继续说下一笔</div>`);
+      clearLaunchDraft();
+      if(result.saved.length){
+        launchFeedback(items.map(it=>`<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center"><span class="chip-cat"><span class="dot" style="background:${catColor(it.category)}"></span>${escapeHtml(it.merchant||catName(it.category))}</span><b class="num" style="color:var(--up)">${fmt(it.amount)}</b></div>`).join('')+`<div class="muted" style="font-size:12px;text-align:center;margin-top:4px">✓ 已记 ${result.saved.length} 笔 · 继续说下一笔</div>`);
+        showAIBatchUndo(batchId,result.saved.length);
+      }else{
+        launchFeedback('<div class="card" style="padding:14px">这批账目已入账</div>');
+      }
     }else{
       // 有疑问 → 跳到确认界面(复用 aiModal)
       aiReturnToLaunch=true;aiLaunchDraft=text;
@@ -1669,6 +1891,9 @@ async function launchSend(e){
     }
   }catch(err){
     launchFeedback(`<div class="card" style="color:var(--danger);padding:14px">记账失败:${escapeHtml(err.message)}</div>`);
+  }finally{
+    launchSending=false;
+    const current=$('#launchSendButton');if(current)current.disabled=false;
   }
 }
 function launchFeedback(html){const el=$('#launchFeedback');if(el)el.innerHTML=html;}
@@ -1703,7 +1928,7 @@ async function processLaunchRecording(){
   try{
     const text=await transcribe(blob,'wav');
     if(!text.trim())throw new Error('没听清,请再说一遍');
-    $('#launchText').value=text;        // 回填,让用户看到"听到了什么"
+    setLaunchText(text);                // 回填并立即加密保存草稿
     launchFeedback(`<div class="muted" style="font-size:13px;background:var(--surface-muted);border-radius:10px;padding:10px 12px">🎙️ 听到:${escapeHtml(text)}</div>`);
     await launchSend();                 // 自动拆账入账
   }catch(err){
@@ -1714,7 +1939,7 @@ async function processLaunchRecording(){
 /* ===================== AI 语音记账 ===================== */
 let mediaRec=null,audioChunks=[],audioMime='',recTimer=null,recSecs=0;
 function openVoice(){
-  aiReturnToLaunch=false;aiLaunchDraft='';
+  aiReturnToLaunch=false;aiLaunchDraft='';aiItems=[];aiBatchId='';aiEditorRecognizedText='';
   const canRec=!!(navigator.mediaDevices&&window.MediaRecorder);
   $('#aiModalBody').innerHTML=`
     <div class="ai-badge" style="margin-bottom:14px">语音记账 · ${escapeHtml(cfg.asrModel)}</div>
@@ -1956,7 +2181,7 @@ function closeModal(id){
     const draft=aiLaunchDraft;
     aiReturnToLaunch=false;aiLaunchDraft='';
     openLaunch();
-    if(draft)$('#launchText').value=draft;
+    if(draft)setLaunchText(draft);
   }
 }
 $$('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m.id);}));
@@ -2007,8 +2232,9 @@ async function fetchCloudVault(){
 // 启动门禁:记住钥匙→直接进;否则按"有无账本"显示创建/解锁
 async function gate(){
   cryptoKey=await loadRememberedKey();
-  if(cryptoKey){boot();return;}
+  if(cryptoKey){await restoreLaunchDraft();await boot();return;}
   // 没记住钥匙:取本地或云端的 vault 决定模式
+  document.documentElement.dataset.startupLocked='1';
   let vault=getVault();
   const ls=$('#lockScreen');ls.style.display='grid';
   const inp=$('#lockInput'),inp2=$('#lockInput2'),err=$('#lockErr'),btn=$('#lockBtn'),
@@ -2044,7 +2270,8 @@ async function gate(){
       }catch(e){cryptoKey=null;err.textContent='主密码错误';inp.value='';inp.focus();return;}
     }
     if($('#lockRemember').checked)await rememberKey(cryptoKey);
-    ls.style.display='none';boot();
+    await restoreLaunchDraft();
+    ls.style.display='none';await boot();
   };
   btn.onclick=submit;
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){creating?inp2.focus():submit();}});
@@ -2077,14 +2304,18 @@ async function boot(){
   applyTheme();
   renderNav();
   render();
-  setupPWA();
   if(cfg.launchCapture)openLaunch();   // 开屏记账:打开直接进记账页
+  document.documentElement.dataset.booted='1';
+  delete document.documentElement.dataset.startupLocked;
+  delete document.documentElement.dataset.startupLaunch;
   // 启动后台增量同步 + 网络恢复/回到前台自动同步
   setTimeout(syncNow,800);
   window.addEventListener('online',syncNow);
   window.addEventListener('offline',()=>setSyncStatus('offline'));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
 }
+setupPWA();
+initLaunchDraftCapture();
 gate();  // 入口:先过密码门,再 boot
 // 首次拉取:只把云端数据写入本地,不触发渲染(此时 UI 尚未就绪)
 async function pullInitial(){
@@ -2096,30 +2327,11 @@ async function pullInitial(){
   setSyncMeta({since:out.now});
 }
 
-/* ===================== PWA(单文件内联) ===================== */
+/* ===================== PWA ===================== */
 function setupPWA(){
-  // 1) 动态注入 manifest(Blob URL,保持单文件)
-  const icon="data:image/svg+xml,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='512' height='512' rx='112' fill='#0B5E42'/><text x='256' y='350' font-size='280' font-family='PingFang SC,sans-serif' fill='white' text-anchor='middle'>墨</text></svg>");
-  const manifest={
-    name:"墨记 · 极简记账",short_name:"墨记",
-    start_url:".",scope:".",display:"standalone",orientation:"portrait",
-    background_color:"#FBFBFA",theme_color:"#0B5E42",
-    description:"极简个人记账,AI 截图记账,数据本地存储",
-    icons:[
-      {src:icon,sizes:"192x192",type:"image/svg+xml",purpose:"any"},
-      {src:icon,sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}
-    ]
-  };
-  const mBlob=new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"});
-  const link=document.createElement("link");
-  link.rel="manifest";link.href=URL.createObjectURL(mBlob);
-  document.head.appendChild(link);
-
-  // 2) 注册 Service Worker(需 https/localhost;file:// 或纯本地双击会静默跳过)
-  // SW 必须来自真实 http(s) 脚本文件(Chrome 不允许 blob/data URL 注册),故用同目录 sw.js
   if(!("serviceWorker"in navigator))return;
   if(location.protocol!=="https:"&&location.hostname!=="localhost"&&location.hostname!=="127.0.0.1")return;
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
+  navigator.serviceWorker.register("./sw.js",{updateViaCache:"none"}).then(reg=>reg.update()).catch(()=>{});
 }
 </script>
 </body>
