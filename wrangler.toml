@@ -6,4 +6,4 @@ pages_build_output_dir = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "moji-db"
-database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+database_id = "c935733b-cf5d-4662-b1f5-1175b470914d"

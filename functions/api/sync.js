@@ -13,7 +13,7 @@ function checkPass(request, env) {
   return request.headers.get('X-Moji-Pass') === env.APP_PASS;
 }
 
-const STORES = new Set(['transactions', 'accounts', 'categories', 'budgets', 'goals']);
+const STORES = new Set(['transactions', 'accounts', 'categories', 'budgets', 'goals', 'rules', 'meta']);
 
 export async function onRequestPost({ request, env }) {
   if (!env.DB) return json({ error: 'D1 未绑定(检查 Pages 设置里的 DB 绑定)' }, 500);
