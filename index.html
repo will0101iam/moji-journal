@@ -629,11 +629,11 @@ let cfg=JSON.parse(localStorage.getItem('mojiCfg')||'null')||{
   apiKey:'',
   apiBase:'https://openrouter.ai/api/v1/chat/completions',
   model:'deepseek/deepseek-v4.1-flash-1017',
-  asrModel:'qwen/qwen3-asr-0.6b',
+  asrModel:'qwen/qwen3-asr-1.7b',
   launchCapture:true           // 打开 app 默认直接进开屏记账页
 };
 function saveCfg(){localStorage.setItem('mojiCfg',JSON.stringify(cfg));}
-if(!cfg.asrModel||cfg.asrModel==='qwen/qwen3.8-omni-flash')cfg.asrModel='qwen/qwen3-asr-0.6b'; // 补/迁移默认 ASR 模型
+if(!cfg.asrModel||['qwen/qwen3.8-omni-flash','qwen/qwen3-asr-0.6b'].includes(cfg.asrModel)){cfg.asrModel='qwen/qwen3-asr-1.7b';saveCfg();} // 迁移旧 ASR
 // 一次性迁移：此前版本默认关闭开屏记账，新版本改为默认开启；用户之后仍可在设置中关闭。
 if(localStorage.getItem('mojiLaunchDefaultV2')!=='1'){
   cfg.launchCapture=true;saveCfg();localStorage.setItem('mojiLaunchDefaultV2','1');
@@ -1239,7 +1239,7 @@ function viewSettings(){
         <div class="field"><label>视觉模型(截图记账)</label>
           <input class="input" id="s_model" value="${escapeHtml(cfg.model)}" placeholder="deepseek/deepseek-v4.1-flash-1017"></div>
         <div class="field"><label>语音模型(语音记账)</label>
-          <input class="input" id="s_asr" value="${escapeHtml(cfg.asrModel)}" placeholder="qwen/qwen3-asr-0.6b"></div>
+          <input class="input" id="s_asr" value="${escapeHtml(cfg.asrModel)}" placeholder="qwen/qwen3-asr-1.7b"></div>
       </div>
       <div class="muted" style="font-size:12px;line-height:1.6;margin-bottom:14px">
         ✅ API Key 已安全存放在服务器,你无需填写。截图记账用视觉模型,语音/自然语言记账用 ASR 转写 + 文本模型拆账。模型可按需替换成 OpenRouter 上其他对应模型。
@@ -1302,7 +1302,7 @@ function viewSettings(){
     </div>
   </div>`;
 }
-function saveAICfg(){cfg.model=$('#s_model').value.trim();cfg.asrModel=$('#s_asr').value.trim()||'qwen/qwen3-asr-0.6b';saveCfg();toast('模型配置已保存');}
+function saveAICfg(){cfg.model=$('#s_model').value.trim();cfg.asrModel=$('#s_asr').value.trim()||'qwen/qwen3-asr-1.7b';saveCfg();toast('模型配置已保存');}
 function toggleLaunchCapture(el){cfg.launchCapture=!cfg.launchCapture;el.classList.toggle('on',cfg.launchCapture);saveCfg();toast(cfg.launchCapture?'已开启:打开直接记账':'已关闭');}
 // 一级分类(有图标/颜色/收支类型)
 function openTopCatModal(id){
@@ -1732,7 +1732,10 @@ async function transcribe(blob,ext){
     headers:{'Content-Type':'application/json','X-Moji-Pass':getPass()},
     body:JSON.stringify({model:cfg.asrModel,audio:wavB64})
   });
-  if(!res.ok)throw new Error('转写 HTTP '+res.status+' '+(await res.text()).slice(0,100));
+  if(!res.ok){
+    let err;try{err=await res.json();}catch(e){}
+    throw new Error(err?.error||`语音转写失败(${res.status})`);
+  }
   const j=await res.json();
   return j.text||j.results?.[0]?.text||'';
 }
