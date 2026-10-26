@@ -9,7 +9,8 @@
 | `index.html` | 整个 app(前端 + 本地存储 + 同步逻辑) |
 | `sw.js` | Service Worker,负责离线缓存(让 app 能装成主屏 App) |
 | `manifest.webmanifest` | PWA 安装信息与启动参数 |
-| `icon.svg` | PWA 应用图标 |
+| `apple-touch-icon.png` | iPhone/iPad 主屏幕图标(180x180) |
+| `icon-192.png` / `icon-512.png` | PWA 标准图标 |
 | `functions/api/sync.js` | 后端同步接口(Cloudflare Pages Function) |
 | `schema.sql` | D1 数据库建表语句 |
 | `wrangler.toml` | Cloudflare 配置(D1 绑定) |

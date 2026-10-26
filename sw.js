@@ -1,9 +1,11 @@
 /* 墨记 Service Worker — 已安装外壳立即启动,后台更新下一次启动版本 */
-const CACHE = 'moji-v4-20261026';
+const CACHE = 'moji-v5-20261026-icon';
 const SHELL_URL = new URL('./index.html', self.registration.scope).href;
 const STATIC_URLS = [
   new URL('./manifest.webmanifest', self.registration.scope).href,
-  new URL('./icon.svg', self.registration.scope).href,
+  new URL('./apple-touch-icon.png', self.registration.scope).href,
+  new URL('./icon-192.png', self.registration.scope).href,
+  new URL('./icon-512.png', self.registration.scope).href,
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 
