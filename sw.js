@@ -1,5 +1,5 @@
-/* 墨记 Service Worker — 已安装外壳立即启动,后台更新下一次启动版本 */
-const CACHE = 'moji-v5-20261026-icon';
+/* MOJI Service Worker — 已安装外壳立即启动,后台更新下一次启动版本 */
+const CACHE = 'moji-v6-20261027-home';
 const SHELL_URL = new URL('./index.html', self.registration.scope).href;
 const STATIC_URLS = [
   new URL('./manifest.webmanifest', self.registration.scope).href,

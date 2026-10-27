@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#121512" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="墨记">
+<meta name="apple-mobile-web-app-title" content="MOJI">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -27,7 +27,7 @@
   }
 })();
 </script>
-<title>墨记 · 极简记账</title>
+<title>MOJI · 极简记账</title>
 <style>
 /* ============ 设计 Token:墨绿极简高级感 ============ */
 :root{
@@ -100,8 +100,8 @@ a{color:inherit;text-decoration:none}
   display:flex;flex-direction:column;padding:var(--sp-20) var(--sp-12);
 }
 .brand{display:flex;align-items:center;gap:var(--sp-12);padding:var(--sp-8) var(--sp-12) var(--sp-24);}
-.brand-logo{width:28px;height:28px;border-radius:8px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:600;font-size:15px}
-.brand-name{font-weight:600;font-size:16px;letter-spacing:.3px}
+.brand-logo{width:28px;height:28px;border-radius:8px;display:block;object-fit:cover}
+.brand-name{font-weight:600;font-size:16px;letter-spacing:0}
 .brand-sub{font-size:11px;color:var(--text-faint);margin-top:-2px}
 .nav{display:flex;flex-direction:column;gap:2px;flex:1}
 .nav-item{
@@ -160,10 +160,32 @@ a{color:inherit;text-decoration:none}
 
 /* KPI */
 .kpi-label{font-size:13px;color:var(--text-muted);font-weight:500}
-.kpi-value{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:-.5px;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi-value{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:0;margin-top:6px;font-variant-numeric:tabular-nums}
 .kpi-delta{font-size:12px;margin-top:6px;font-weight:500}
 .kpi-delta.up{color:var(--up)}
 .kpi-delta.down{color:var(--down)}
+
+/* 主页:今日优先,预算和月支出作为决策辅助 */
+.home-summary{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:var(--sp-16)}
+.home-today,.home-metrics{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
+.home-today{padding:var(--sp-24);display:flex;flex-direction:column;justify-content:space-between;min-height:156px;container-type:inline-size}
+.home-today-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.home-today-date{font-size:12px;color:var(--text-faint)}
+.home-today-value{font-family:var(--mono);font-size:38px;font-size:clamp(30px,8cqi,38px);font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--up);margin-top:12px;white-space:nowrap}
+.home-today-meta{font-size:12px;color:var(--text-muted);margin-top:4px}
+.home-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden}
+.home-metric{padding:var(--sp-20);min-width:0;display:flex;flex-direction:column;container-type:inline-size}
+.home-metric+.home-metric{border-left:1px solid var(--border)}
+.home-metric-value{font-family:var(--mono);font-size:24px;font-size:clamp(17px,9cqi,24px);font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;margin-top:10px;white-space:nowrap}
+.home-metric-meta{font-size:12px;color:var(--text-muted);margin-top:6px;min-height:18px}
+.home-metric-link{color:var(--brand-text);font-size:12px;font-weight:600;text-align:left;margin-top:6px;width:max-content}
+.home-budget-bar{height:6px;border-radius:var(--radius-full);background:var(--surface-muted);overflow:hidden;margin-top:auto}
+.home-budget-fill{height:100%;border-radius:inherit;background:var(--brand)}
+.home-budget-fill.over{background:var(--danger)}
+.home-detail-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:var(--sp-16);margin-top:var(--sp-16)}
+.home-chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.home-chart-total{font-family:var(--mono);font-size:12px;color:var(--text-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.home-chart-wrap{height:170px}
 
 /* 列表 */
 .tx-row{display:flex;align-items:center;gap:var(--sp-12);padding:11px 0;border-top:1px solid var(--border)}
@@ -255,7 +277,7 @@ textarea.input{resize:vertical;min-height:60px}
 .launch.open,html[data-startup-launch="1"]:not([data-startup-locked="1"]):not([data-booted="1"]) .launch{display:flex}
 .launch-head{display:flex;align-items:center;justify-content:space-between;height:48px;flex-shrink:0}
 .launch-brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px}
-.launch-mark{width:28px;height:28px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
+.launch-mark{width:28px;height:28px;border-radius:8px;display:block;object-fit:cover}
 .launch-exit{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--surface-muted);color:var(--text-muted)}
 .launch-exit svg{width:20px;height:20px}
 .launch-exit:active{background:var(--border-strong)}
@@ -342,6 +364,10 @@ textarea.input{resize:vertical;min-height:60px}
   .modal-bg{align-items:flex-end;padding:0}           /* 手机:底部弹出式 sheet */
   .modal.wide{max-width:none}
   .kpi-value{font-size:30px}
+  .home-summary,.home-detail-grid{grid-template-columns:1fr}
+  .home-today{min-height:148px}
+  .home-metric{padding:var(--sp-16)}
+  .home-chart-wrap{height:160px}
   .tx-icon{width:38px;height:38px}
   .budget-category-layout{grid-template-columns:1fr;gap:14px;justify-items:center}
   .budget-category-list{width:100%}
@@ -349,6 +375,7 @@ textarea.input{resize:vertical;min-height:60px}
 }
 canvas{max-width:100%}
 html[data-startup-locked="1"] #lockScreen{display:grid!important}
+.lock-logo{width:56px;height:56px;border-radius:16px;display:block;object-fit:cover;margin:0 auto 20px}
 .seg{display:inline-flex;background:var(--surface-muted);border-radius:var(--radius);padding:3px;gap:2px}
 .seg button{padding:5px 12px;border-radius:7px;font-size:13px;font-weight:500;color:var(--text-muted)}
 .seg button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
@@ -366,8 +393,8 @@ html[data-startup-locked="1"] #lockScreen{display:grid!important}
 <!-- 密码锁屏(端到端加密:主密码即解密钥匙) -->
 <div id="lockScreen" style="position:fixed;inset:0;z-index:200;background:var(--bg);display:none;place-items:center;padding:24px">
   <div style="width:100%;max-width:320px;text-align:center">
-    <div style="width:56px;height:56px;border-radius:16px;background:var(--brand);display:grid;place-items:center;color:#fff;font-size:26px;font-weight:600;margin:0 auto 20px">墨</div>
-    <div style="font-size:20px;font-weight:600;margin-bottom:6px">墨记</div>
+    <img class="lock-logo" src="./icon-192.png" alt="">
+    <div style="font-size:20px;font-weight:600;margin-bottom:6px">MOJI</div>
     <div id="lockSub" style="font-size:13px;color:var(--text-muted);margin-bottom:22px">输入主密码解锁</div>
     <input id="lockInput" type="password" autocomplete="off" placeholder="主密码"
       style="width:100%;padding:14px;text-align:center;font-size:16px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);outline:none">
@@ -387,15 +414,15 @@ html[data-startup-locked="1"] #lockScreen{display:grid!important}
   <button class="menu-btn" onclick="toggleMenu()" aria-label="菜单">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round"/></svg>
   </button>
-  <span class="topbar-title" id="topbarTitle">仪表盘</span>
+  <span class="topbar-title" id="topbarTitle">主页</span>
 </header>
 
 <!-- 侧边 -->
 <aside class="sidebar" id="sidebar">
   <div class="brand">
-    <div class="brand-logo">墨</div>
+    <img class="brand-logo" src="./icon-192.png" alt="">
     <div>
-      <div class="brand-name">墨记</div>
+      <div class="brand-name">MOJI</div>
       <div class="brand-sub">极简个人记账</div>
     </div>
   </div>
@@ -433,7 +460,7 @@ html[data-startup-locked="1"] #lockScreen{display:grid!important}
 <!-- 开屏记账(全屏,可在设置里开关) -->
 <section class="launch" id="launchCapture" aria-label="快速记账">
   <header class="launch-head">
-    <div class="launch-brand"><span class="launch-mark">墨</span>墨记</div>
+    <div class="launch-brand"><img class="launch-mark" src="./icon-192.png" alt="">MOJI</div>
     <button class="launch-exit" onclick="closeLaunch()" aria-label="进入首页">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 6l12 12M18 6L6 18" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -760,7 +787,7 @@ const ICONS={
   settings:'<circle cx="12" cy="12" r="3" stroke-width="1.6" fill="none"/><path d="M12 2v3m0 14v3m10-10h-3M5 12H2m15.5-6.5l-2 2m-7 7l-2 2m13 0l-2-2m-7-7l-2-2" stroke-width="1.4" stroke-linecap="round"/>'
 };
 const ROUTES=[
-  ['dashboard','仪表盘'],['tx','交易'],['budget','预算'],['accounts','账户'],['settings','设置']
+  ['dashboard','主页'],['tx','交易'],['budget','预算'],['accounts','账户'],['settings','设置']
 ];
 let curRoute='dashboard';
 function renderNav(){
@@ -784,7 +811,7 @@ window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(h&&h
 
 function render(){
   const fns={dashboard:viewDashboard,tx:viewTx,budget:viewBudget,accounts:viewAccounts,settings:viewSettings};
-  const tb=$('#topbarTitle');if(tb)tb.textContent=(ROUTES.find(r=>r[0]===curRoute)||[])[1]||'墨记';
+  const tb=$('#topbarTitle');if(tb)tb.textContent=(ROUTES.find(r=>r[0]===curRoute)||[])[1]||'MOJI';
   (fns[curRoute]||viewDashboard)();
 }
 
@@ -810,62 +837,109 @@ function detectSubs(){
   return subs;
 }
 
-/* ===================== 视图:仪表盘 ===================== */
+/* ===================== 视图:主页 ===================== */
 let charts={};
 function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};}
 window.addEventListener('moji:chart-ready',()=>{
+  if(curRoute==='dashboard'&&$('#homeDailyBar')&&!charts.homeDaily)renderHomeDailyChart();
   if(curRoute==='budget'&&$('#dailyBar')&&!charts.dailyBar)viewBudget();
 });
+function recentDailySpend(days=7){
+  const totals={};
+  DATA.tx.filter(t=>t.kind==='exp').forEach(t=>{totals[t.date]=(totals[t.date]||0)+t.amount;});
+  const today=new Date();today.setHours(12,0,0,0);
+  return Array.from({length:days},(_,index)=>{
+    const date=new Date(today);date.setDate(today.getDate()-(days-1-index));
+    return {
+      date:todayISO(date),
+      label:index===days-1?'今天':`${date.getMonth()+1}/${date.getDate()}`,
+      value:totals[todayISO(date)]||0
+    };
+  });
+}
 function viewDashboard(){
   destroyCharts();
   const mt=monthTx();
-  const inc=sumBy(mt,'inc'),exp=sumBy(mt,'exp'),net=inc-exp;
+  const exp=sumBy(mt,'exp'),today=todayISO();
+  const todayExpenses=mt.filter(t=>t.kind==='exp'&&t.date===today);
+  const todayExp=sumBy(todayExpenses,'exp');
+  const monthExpenses=mt.filter(t=>t.kind==='exp');
+  const monthlyBudget=DATA.budgets.find(b=>b.month===curMonth()&&b.scope==='month');
+  const hasBudget=!!(monthlyBudget&&monthlyBudget.limit>0);
+  const budgetRemaining=hasBudget?monthlyBudget.limit-exp:0;
+  const budgetUsed=hasBudget?exp/monthlyBudget.limit*100:0;
+  const dayOfMonth=new Date().getDate();
+  const dailySeries=recentDailySpend();
+  const sevenDayTotal=dailySeries.reduce((sum,item)=>sum+item.value,0);
   // 上月对比
   const lm=new Date();lm.setMonth(lm.getMonth()-1);const lmk=lm.toISOString().slice(0,7);
   const lastExp=sumBy(monthTx(lmk),'exp');
-  const expDelta=lastExp?((exp-lastExp)/lastExp*100):0;
   // 分类占比(按一级汇总)
   const byCat={};
-  mt.filter(t=>t.kind==='exp').forEach(t=>{const top=topOf(t.category);if(top)byCat[top.id]=(byCat[top.id]||0)+t.amount;});
+  monthExpenses.forEach(t=>{const top=topOf(t.category);if(top)byCat[top.id]=(byCat[top.id]||0)+t.amount;});
   const catArr=Object.entries(byCat).map(([id,v])=>({cat:catById(id),v})).filter(x=>x.cat).sort((a,b)=>b.v-a.v);
   const recent=DATA.tx.slice(0,6);
   const insights=buildInsights(mt,exp,lastExp,catArr);
+  const todayLabel=new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
 
   $('#main').innerHTML=`
   <div class="page">
     <div class="page-head">
       <div>
-        <div class="page-title">仪表盘</div>
-        <div class="page-sub">${new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long'})} · 概览</div>
+        <div class="page-title">主页</div>
+        <div class="page-sub">${new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'})} · 花销概览</div>
       </div>
       <button class="btn" onclick="openTxModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>记一笔</button>
     </div>
 
-    <div class="grid grid-3">
-      <div class="card">
-        <div class="kpi-label">本月净现金流</div>
-        <div class="kpi-value" style="color:${net>=0?'var(--down)':'var(--up)'}">${net>=0?'+':'-'}${fmt(net)}</div>
-        <div class="kpi-delta ${expDelta<=0?'down':'up'}">${lastExp?`支出环比 ${expDelta>=0?'+':''}${expDelta.toFixed(0)}%`:'暂无对比'}</div>
-      </div>
-      <div class="card">
-        <div class="kpi-label">本月支出</div>
-        <div class="kpi-value" style="color:var(--up)">${fmt(exp)}</div>
-        <div class="kpi-delta muted">共 ${mt.filter(t=>t.kind==='exp').length} 笔</div>
-      </div>
-      <div class="card">
-        <div class="kpi-label">净资产</div>
-        <div class="kpi-value">${fmt(netWorth())}</div>
-        <div class="kpi-delta muted">${DATA.accounts.length} 个账户</div>
-      </div>
+    <div class="home-summary">
+      <section class="home-today">
+        <div class="home-today-head">
+          <div class="kpi-label">今日支出</div>
+          <div class="home-today-date">${todayLabel}</div>
+        </div>
+        <div>
+          <div class="home-today-value">${fmt(todayExp)}</div>
+          <div class="home-today-meta">今天共 ${todayExpenses.length} 笔支出</div>
+        </div>
+      </section>
+      <section class="home-metrics">
+        <div class="home-metric">
+          <div class="kpi-label">${hasBudget?(budgetRemaining>=0?'本月可用预算':'本月已超预算'):'本月可用预算'}</div>
+          <div class="home-metric-value" style="color:${!hasBudget?'var(--text)':budgetRemaining<0?'var(--up)':'var(--down)'}">${hasBudget?fmt(Math.abs(budgetRemaining)):'--'}</div>
+          ${hasBudget?`
+            <div class="home-metric-meta">总预算 ${fmt(monthlyBudget.limit)} · 已用 ${budgetUsed.toFixed(0)}%</div>
+            <div class="home-budget-bar"><div class="home-budget-fill ${budgetUsed>100?'over':''}" style="width:${Math.min(100,budgetUsed)}%"></div></div>
+          `:`<button class="home-metric-link" onclick="go('budget')">设置月预算</button>`}
+        </div>
+        <div class="home-metric">
+          <div class="kpi-label">本月已支出</div>
+          <div class="home-metric-value" style="color:var(--up)">${fmt(exp)}</div>
+          <div class="home-metric-meta">${monthExpenses.length} 笔 · 日均 ${fmt(dayOfMonth?exp/dayOfMonth:0)}</div>
+        </div>
+      </section>
     </div>
 
-    <div class="card mt16" style="display:flex;flex-direction:column">
-      <div class="card-title">AI 洞察</div>
-      <div style="display:flex;flex-direction:column;gap:12px;flex:1">
-        ${insights.map(i=>`<div style="display:flex;gap:10px;align-items:flex-start">
-          <span style="font-size:16px;flex-shrink:0">${i.icon}</span>
-          <span style="font-size:13px;line-height:1.5">${i.text}</span></div>`).join('')}
-      </div>
+    <div class="home-detail-grid">
+      <section class="card">
+        <div class="home-chart-head">
+          <div>
+            <div class="card-title" style="margin:0">每日支出趋势</div>
+            <div class="muted" style="font-size:12px;margin-top:3px">最近 7 天</div>
+          </div>
+          <div class="home-chart-total">合计 ${fmt(sevenDayTotal)}</div>
+        </div>
+        <div class="home-chart-wrap"><canvas id="homeDailyBar"></canvas></div>
+      </section>
+
+      <section class="card" style="display:flex;flex-direction:column">
+        <div class="card-title">AI 洞察</div>
+        <div style="display:flex;flex-direction:column;gap:12px;flex:1">
+          ${insights.map(i=>`<div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:16px;flex-shrink:0">${i.icon}</span>
+            <span style="font-size:13px;line-height:1.5">${i.text}</span></div>`).join('')}
+        </div>
+      </section>
     </div>
 
     <div class="card mt16">
@@ -876,6 +950,37 @@ function viewDashboard(){
       ${recent.length?recent.map(txRowHtml).join(''):'<div class="empty">还没有记录,点右下角 + 开始记账</div>'}
     </div>
   </div>`;
+  renderHomeDailyChart();
+}
+function renderHomeDailyChart(){
+  const canvas=$('#homeDailyBar');
+  if(!window.Chart||!canvas)return;
+  const series=recentDailySpend(),css=getComputedStyle(document.body);
+  const cText=css.getPropertyValue('--text-muted').trim();
+  const cBorder=css.getPropertyValue('--border').trim();
+  const cBrand=css.getPropertyValue('--brand').trim();
+  const cDanger=css.getPropertyValue('--danger').trim();
+  charts.homeDaily=new Chart(canvas,{
+    type:'bar',
+    data:{
+      labels:series.map(item=>item.label),
+      datasets:[{
+        data:series.map(item=>item.value),
+        backgroundColor:series.map((_,index)=>index===series.length-1?cDanger:cBrand+'55'),
+        borderRadius:4,
+        barPercentage:.72,
+        categoryPercentage:.8
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:250},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>'支出 '+fmt(item.raw)}}},
+      scales:{
+        y:{beginAtZero:true,border:{display:false},ticks:{color:cText,maxTicksLimit:4},grid:{color:cBorder}},
+        x:{border:{display:false},ticks:{color:cText},grid:{display:false}}
+      }
+    }
+  });
 }
 function buildInsights(mt,exp,lastExp,catArr){
   const out=[];
