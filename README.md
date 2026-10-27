@@ -90,6 +90,13 @@ git add -A && git commit -m "更新" && git push
 ```
 Cloudflare 会自动重新部署,几十秒后生效。
 
+## 同步 Downloads 独立副本
+
+独立 HTML 依赖同目录图标和 manifest，使用脚本统一导出，避免只复制 HTML 造成坏图:
+```bash
+./scripts/export-standalone.sh
+```
+
 ## 关于 AI Key 安全
 
 API Key 存在你浏览器本地(设置页填),不进代码仓库。配合密码(前端门 + 后端 APP_PASS),别人打不开 app、调不了接口,也就用不了你的 Key。✅
