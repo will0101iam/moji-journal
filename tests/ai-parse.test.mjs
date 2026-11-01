@@ -9,8 +9,9 @@ const root=fileURLToPath(new URL('..',import.meta.url));
 const html=readFileSync(root+'index.html','utf8');
 
 function source(name){
-  const start=html.indexOf(`function ${name}(`);
+  let start=html.indexOf(`function ${name}(`);
   assert.ok(start>=0,`index.html 缺少 ${name}`);
+  if(html.startsWith('async ',start-6))start-=6;
   let depth=0;
   for(let i=html.indexOf('{',start);i<html.length;i++){
     if(html[i]==='{')depth++;
@@ -19,8 +20,16 @@ function source(name){
   throw new Error(`${name} 括号不匹配`);
 }
 
-const context=vm.createContext({});
-vm.runInContext(['readAIResponse','extractJSON'].map(source).join('\n'),context);
+const sent=[];
+const context=vm.createContext({
+  getPass:()=>'',
+  fetch:async(url,init)=>{
+    sent.push(JSON.parse(init.body));
+    return {ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{"items":[]}'}}]})};
+  }
+});
+vm.runInContext(['callOR','readAIResponse','extractJSON'].map(source).join('\n'),context);
+const callOR=body=>context.callOR(body);
 const readAIResponse=json=>context.readAIResponse(json);
 const extractJSON=text=>context.extractJSON(text);
 const fixture=name=>JSON.parse(readFileSync(`${root}tests/fixtures/${name}.json`,'utf8'));
@@ -52,9 +61,15 @@ test('只有推理没有正文时明确报错',()=>{
   assert.throws(()=>readAIResponse({choices:[{finish_reason:'stop',message:{content:'',reasoning:'{"amount":"4"}'}}]}),/模型无返回/);
 });
 
+test('所有拆账请求(含截图识别)都关闭推理',async()=>{
+  sent.length=0;
+  await callOR({model:'m',messages:[{role:'user',content:[{type:'text',text:'识别小票'}]}],max_tokens:3000});
+  assert.deepEqual(JSON.parse(JSON.stringify(sent[0].reasoning)),{enabled:false});
+});
+
 let failed=0;
 for(const {name,fn} of cases){
-  try{fn();console.log(`ok   ${name}`);}
+  try{await fn();console.log(`ok   ${name}`);}
   catch(error){failed++;console.log(`FAIL ${name}\n     ${error.message}`);}
 }
 console.log(`${cases.length-failed}/${cases.length} passed`);

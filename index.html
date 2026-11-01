@@ -2179,12 +2179,13 @@ const ACCOUNT_PROMPT=()=>`今天是 ${todayISO()}。语音或文本里出现的�
 // 文本拆账(语音转写后 / 手动输入)
 async function callTextParse(text){
   const prompt='你是私人记账助手,把用户明确发生的消费/收入拆成结构化账目。'+ACCOUNT_PROMPT()+`\n用户说:「${text}」`;
-  // 拆账是结构化抽取,关闭推理:实测推理会耗尽输出预算并截断 JSON
-  const body={model:cfg.model,messages:[{role:'user',content:prompt}],temperature:0,max_tokens:3000,response_format:{type:'json_object'},reasoning:{enabled:false}};
+  const body={model:cfg.model,messages:[{role:'user',content:prompt}],temperature:0,max_tokens:3000,response_format:{type:'json_object'}};
   return parseAccountJSON(await callOR(body),{sourceText:text,requireExplicitCertainty:true});
 }
 // 统一 OpenRouter 调用,返回模型最终答案文本
 async function callOR(body){
+  // 拆账/识图都是结构化抽取,关闭推理:实测推理会耗尽输出预算并截断 JSON
+  body={...body,reasoning:{enabled:false}};
   // 走后端代理 /api/ai,Key 存 Cloudflare 环境变量,前端只带密码
   const res=await fetch('/api/ai',{
     method:'POST',
