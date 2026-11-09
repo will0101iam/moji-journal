@@ -1724,7 +1724,7 @@ async function handleAIFile(file){
     const items=await callVision(b64,file.type);
     renderAIResult(items);
   }catch(e){
-    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">识别失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">检查 API Key / 模型是否支持视觉 / 网络。</span></div>`;
+    $('#aiResult').innerHTML=renderAIError('识别失败',e);
   }
 }
 function fileToB64(file){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file);});}
@@ -1743,7 +1743,7 @@ async function callVision(dataUrl){
     ]}],
     max_tokens:3000
   };
-  return parseAccountJSON(await callOR(body),{requireExplicitCertainty:true});
+  return callOR(body,{requireExplicitCertainty:true});
 }
 // 从可能含代码块/推理过程的文本里稳健提取 JSON 对象
 function extractJSON(txt){
@@ -1996,7 +1996,7 @@ async function launchSend(e){
       openModal('aiModal');$('#aiModalBody').innerHTML='<div id="aiResult"></div>';renderAIResult(items,text);
     }
   }catch(err){
-    launchFeedback(`<div class="card" style="color:var(--danger);padding:14px">记账失败:${escapeHtml(err.message)}</div>`);
+    launchFeedback(renderAIError('记账失败',err));
   }finally{
     launchSending=false;
     const current=$('#launchSendButton');if(current)current.disabled=false;
@@ -2101,7 +2101,7 @@ async function processRecording(){
     const items=await callTextParse(text);
     renderAIResult(items,text);
   }catch(e){
-    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">识别失败:${escapeHtml(e.message)}<br><span class="muted" style="font-size:12px">可改用下方"手动输入文字"。检查 API Key / ASR 模型 / 网络。</span></div>`;
+    $('#aiResult').innerHTML=renderAIError('识别失败',e);
   }
 }
 // 调 OpenRouter 转写端点:先把录音解码重采样成 16kHz 单声道 WAV(小 ASR 模型识别率更高),再 base64 上传
@@ -2162,7 +2162,7 @@ async function parseVoiceText(){
     const items=await callTextParse(text);
     renderAIResult(items,text);
   }catch(e){
-    $('#aiResult').innerHTML=`<div class="card" style="color:var(--danger)">拆账失败:${escapeHtml(e.message)}</div>`;
+    $('#aiResult').innerHTML=renderAIError('拆账失败',e);
   }
 }
 const AI_CATEGORY_CANDIDATES=()=>leafCats().map(c=>({id:c.id,name:catFull(c.id),kind:c.kind}));
@@ -2180,27 +2180,110 @@ const ACCOUNT_PROMPT=()=>`今天是 ${todayISO()}。语音或文本里出现的�
 async function callTextParse(text){
   const prompt='你是私人记账助手,把用户明确发生的消费/收入拆成结构化账目。'+ACCOUNT_PROMPT()+`\n用户说:「${text}」`;
   const body={model:cfg.model,messages:[{role:'user',content:prompt}],temperature:0,max_tokens:3000,response_format:{type:'json_object'}};
-  return parseAccountJSON(await callOR(body),{sourceText:text,requireExplicitCertainty:true});
+  return callOR(body,{sourceText:text,requireExplicitCertainty:true});
+}
+// 每次请求只携带诊断元数据;不持久化账单原文、模型正文或密钥。
+const AI_DIAGNOSTIC_VERSION='20261106-errors-v1',AI_REQUEST_TIMEOUT_MS=60000;
+function aiFailure(code,message,diagnostic={}){
+  const error=new Error(message);
+  error.code=code;error.diagnostic=diagnostic;
+  return error;
+}
+function aiHTTPFailure(status){
+  switch(status){
+    case 400:return ['AI_REQUEST_INVALID','记账请求格式或参数错误'];
+    case 401:return ['AI_ACCESS_DENIED','记账接口验证失败,请重新打开应用'];
+    case 402:return ['AI_BALANCE','模型服务余额不足,需要充值'];
+    case 403:return ['AI_ACCESS_BLOCKED','请求被服务或网络策略拒绝'];
+    case 404:return ['AI_MODEL_UNAVAILABLE','记账接口或当前模型不可用'];
+    case 408:
+    case 504:return ['AI_SERVER_TIMEOUT','服务器响应超时,请稍后重试'];
+    case 429:return ['AI_RATE_LIMIT','模型服务限流,请稍后重试'];
+    default:return ['AI_HTTP_ERROR','记账服务暂时出错,请稍后重试'];
+  }
+}
+function newAIDiagnostic(model){
+  return {
+    version:AI_DIAGNOSTIC_VERSION,requestId:crypto.randomUUID(),time:new Date().toISOString(),
+    model:String(model||'').slice(0,120),stage:'client_request',
+    online:navigator.onLine,visibilityAtStart:document.visibilityState
+  };
+}
+function renderAIError(label,error){
+  const diagnostic=error?.diagnostic;
+  const details=diagnostic?`<details style="margin-top:10px;color:var(--text-muted);font-size:12px">
+    <summary style="cursor:pointer">查看诊断详情（可复制或截图）</summary>
+    <pre style="white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;margin:8px 0 0">${escapeHtml(JSON.stringify({code:error.code,...diagnostic},null,2))}</pre>
+  </details>`:'';
+  return `<div class="card" style="color:var(--danger);padding:14px">${escapeHtml(label)}:${escapeHtml(error?.message||'发生未知错误')}${details}</div>`;
 }
 // 统一 OpenRouter 调用,返回模型最终答案文本
-async function callOR(body){
+async function callOR(body,parseOptions){
   // 拆账/识图都是结构化抽取,关闭推理:实测推理会耗尽输出预算并截断 JSON
   body={...body,reasoning:{enabled:false}};
-  // 走后端代理 /api/ai,Key 存 Cloudflare 环境变量,前端只带密码
-  const res=await fetch('/api/ai',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Moji-Pass':getPass()},
-    body:JSON.stringify(body)
-  });
-  if(!res.ok)throw new Error('HTTP '+res.status+' '+(await res.text()).slice(0,120));
-  return readAIResponse(await res.json());
+  const diagnostic=newAIDiagnostic(body.model),started=Date.now();
+  const controller=new AbortController();
+  let timedOut=false;
+  const timer=setTimeout(()=>{timedOut=true;controller.abort();},AI_REQUEST_TIMEOUT_MS);
+  try{
+    if(navigator.onLine===false)throw aiFailure('AI_OFFLINE','当前设备离线,输入已保留,请联网后重试');
+    // 走后端代理,同一编号贯穿客户端、服务器响应和服务器日志。
+    const res=await fetch('/api/ai',{
+      method:'POST',signal:controller.signal,
+      headers:{'Content-Type':'application/json','X-Moji-Pass':getPass(),'X-Moji-Request-Id':diagnostic.requestId},
+      body:JSON.stringify(body)
+    });
+    diagnostic.httpStatus=res.status;
+    diagnostic.requestId=res.headers.get('X-Moji-Request-Id')||diagnostic.requestId;
+    diagnostic.ray=res.headers.get('CF-Ray')||'';
+    diagnostic.stage='response_body';
+    const raw=await res.text();
+    diagnostic.stage='response_json';
+    let json;
+    try{json=JSON.parse(raw);}catch{
+      if(res.ok)throw aiFailure('AI_RESPONSE_INVALID','记账接口返回了无法读取的数据,请稍后重试');
+    }
+    if(!res.ok){
+      diagnostic.stage='response_status';
+      const server=json?.diagnostic;
+      if(server){
+        if(typeof server.requestId==='string')diagnostic.requestId=server.requestId.slice(0,80);
+        if(typeof server.stage==='string')diagnostic.stage=server.stage.slice(0,80);
+        if(typeof server.elapsedMs==='number')diagnostic.serverElapsedMs=server.elapsedMs;
+        if(typeof server.upstreamStatus==='number')diagnostic.upstreamStatus=server.upstreamStatus;
+        if(typeof server.upstreamRequestId==='string')diagnostic.upstreamRequestId=server.upstreamRequestId.slice(0,120);
+      }
+      const [code,message]=aiHTTPFailure(res.status);
+      const structured=typeof json?.code==='string'&&/^AI_[A-Z_]+$/.test(json.code);
+      throw aiFailure(structured?json.code:code,structured&&typeof json.error==='string'?json.error:message);
+    }
+    diagnostic.stage='model_output';
+    const text=readAIResponse(json);
+    if(parseOptions===undefined)return text;
+    diagnostic.stage='account_parse';
+    return parseAccountJSON(text,parseOptions);
+  }catch(error){
+    diagnostic.elapsedMs=Date.now()-started;
+    diagnostic.online=navigator.onLine;
+    diagnostic.visibilityAtFailure=document.visibilityState;
+    if(typeof error?.code==='string'&&error.code.startsWith('AI_')){error.diagnostic={...diagnostic,...error.diagnostic};throw error;}
+    if(timedOut)throw aiFailure('AI_TIMEOUT','记账请求等待超过 60 秒,输入已保留,请稍后重试',diagnostic);
+    if(diagnostic.stage==='client_request'||diagnostic.stage==='response_body'){
+      throw aiFailure(navigator.onLine===false?'AI_OFFLINE':'AI_NETWORK',
+        navigator.onLine===false?'当前设备离线,输入已保留,请联网后重试':'网络连接失败,请切换 Wi-Fi/移动数据后重试',diagnostic);
+    }
+    throw aiFailure('AI_PARSE_FAILED','账目解析发生异常,请提供诊断详情排查',diagnostic);
+  }finally{
+    clearTimeout(timer);
+  }
 }
 // 只解析最终答案:推理过程里的草稿 JSON 会覆盖真正的多笔结果
 function readAIResponse(j){
+  if(!j||!Array.isArray(j.choices))throw aiFailure('AI_RESPONSE_INVALID','模型返回的数据格式异常,请稍后重试');
   const choice=j.choices?.[0]||{};
-  if(choice.finish_reason==='length')throw new Error('AI 输出被截断,请分段录入');
+  if(choice.finish_reason==='length')throw aiFailure('AI_OUTPUT_TRUNCATED','AI 输出被截断,请分段录入');
   const txt=String(choice.message?.content||'');
-  if(!txt.trim())throw new Error('模型无返回');
+  if(!txt.trim())throw aiFailure('AI_EMPTY_OUTPUT','模型无返回,请稍后重试');
   return txt;
 }
 /* ===================== 智能分类规则 =====================
@@ -2251,9 +2334,10 @@ function resolveAILeaf(it,kind){
 // 把模型返回规范成可编辑草稿:用户规则优先,分类与金额失败时保留条目但禁止自动入账。
 function parseAccountJSON(txt,{sourceText='',requireExplicitCertainty=false}={}){
   const parsed=extractJSON(txt);
-  if(!parsed)throw new Error('未能解析出账目,再说一遍或换种说法');
+  if(!parsed)throw aiFailure('AI_ACCOUNT_JSON_INVALID','模型未返回有效的账目 JSON,请重试');
   const rawItems=Array.isArray(parsed.items)?parsed.items:(parsed.amount!=null?[parsed]:[]);
-  if(!rawItems.length||rawItems.length>30)throw new Error('未识别到有效账目,或一次超过 30 笔,请分段录入');
+  if(!rawItems.length)throw aiFailure('AI_NO_ITEMS','未识别到有效账目,请补充金额和用途');
+  if(rawItems.length>30)throw aiFailure('AI_BATCH_TOO_LARGE','一次超过 30 笔,请分段录入');
   return rawItems.map((it,index)=>{
     const rawKind=String(it.kind||'');
     const kind=['inc','income'].includes(rawKind)?'inc':['exp','expense'].includes(rawKind)?'exp':'';

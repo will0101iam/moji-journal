@@ -4,31 +4,29 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const html=readFileSync(root+'index.html','utf8');
 
 function source(name){
-  let start=html.indexOf(`function ${name}(`);
-  assert.ok(start>=0,`index.html 缺少 ${name}`);
-  if(html.startsWith('async ',start-6))start-=6;
-  let depth=0;
-  for(let i=html.indexOf('{',start);i<html.length;i++){
-    if(html[i]==='{')depth++;
-    else if(html[i]==='}'&&--depth===0)return html.slice(start,i+1);
-  }
-  throw new Error(`${name} 括号不匹配`);
+  const match=html.match(new RegExp(`^((?:async )?function ${name}\\([\\s\\S]*?^\\})`,'m'));
+  assert.ok(match,`index.html 缺少 ${name}`);
+  return match[1];
 }
 
 const sent=[];
 const context=vm.createContext({
+  crypto:webcrypto,AbortController,Response,setTimeout,clearTimeout,
+  navigator:{onLine:true},document:{visibilityState:'visible'},
   getPass:()=>'',
   fetch:async(url,init)=>{
     sent.push(JSON.parse(init.body));
-    return {ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{"items":[]}'}}]})};
+    return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:'{"items":[]}'}}]}));
   }
 });
-vm.runInContext(['callOR','readAIResponse','extractJSON'].map(source).join('\n'),context);
+vm.runInContext(html.match(/^const AI_DIAGNOSTIC_VERSION=.*;$/m)[0]+'\n'+
+  ['aiFailure','aiHTTPFailure','newAIDiagnostic','callOR','readAIResponse','extractJSON'].map(source).join('\n'),context);
 const callOR=body=>context.callOR(body);
 const readAIResponse=json=>context.readAIResponse(json);
 const extractJSON=text=>context.extractJSON(text);
